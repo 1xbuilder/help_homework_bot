@@ -2,7 +2,7 @@
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-# from config import ADMIN_IDS
+from config import ADMIN_IDS  # БАГ БЫЛ: закомментировано, все пользователи получали права админа
 from database.db_session import SessionLocal
 from database.db_operations import get_user_by_telegram_id, create_user
 from states.user_states import UserRegistration
@@ -15,8 +15,8 @@ def get_main_keyboard(user_id: int):
     keyboard.add(KeyboardButton("📚 Посмотреть ДЗ"))
     keyboard.add(KeyboardButton("❓ Помощь"))
     
-    # if user_id in ADMIN_IDS:
-    if True:
+    # БАГ БЫЛ: if True — все пользователи видели кнопки администратора
+    if user_id in ADMIN_IDS:
         keyboard.add(KeyboardButton("➕ Добавить ДЗ"))
         keyboard.add(KeyboardButton("❌ Удалить ДЗ"))
     

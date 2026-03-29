@@ -28,11 +28,9 @@ async def start_add_homework(message: types.Message):
 # Обработка ввода даты
 async def process_date(message: types.Message, state: FSMContext):
     date_text = message.text.lower()
-    print(date_text)
-    if date_text == "завтра":
-        selected_date = datetime.now() + timedelta(days=1)
-    elif date_text == "послезавтра":
-        selected_date = datetime.now() + timedelta(days=2)
+
+    # БАГ БЫЛ 1: дублирующийся if/elif перед match — убран
+    # БАГ БЫЛ 2: "через 9 дней" → timedelta(days=1) — была опечатка, исправлено на days=10
     match date_text:
         case "завтра":
             selected_date = datetime.now() + timedelta(days=1)
@@ -53,7 +51,7 @@ async def process_date(message: types.Message, state: FSMContext):
         case "через 8 дней":
             selected_date = datetime.now() + timedelta(days=9)
         case "через 9 дней":
-            selected_date = datetime.now() + timedelta(days=1)
+            selected_date = datetime.now() + timedelta(days=10)  # было days=1 — опечатка!
         case "через 10 дней":
             selected_date = datetime.now() + timedelta(days=11)
         case _:

@@ -1,28 +1,17 @@
 # Импорты вспомогательных библиотек
 import asyncio
 import logging
-import sqlite3
-import random 
 import os
 
 # Импорты основных библиотек aiogram
-from aiogram import Bot, types
-from aiogram.dispatcher import Dispatcher
-from aiogram.utils import executor
-
-# Импорты вспомогательных библиотек aiogram
-import aiogram.utils.markdown as md
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.types import ParseMode
-from aiogram.utils import executor
-from aiogram.types import ContentType
-from aiogram import Bot, Dispatcher, types
+from aiogram.types import ParseMode, ContentType
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-
+from aiogram.utils import executor
 
 # Импорты файлов
 from config import TOKEN
@@ -35,7 +24,9 @@ dp = Dispatcher(bot, storage=storage)
 from handlers.start import process_start_command, get_main_keyboard, process_user_name
 from handlers.homework import show_homework_menu, back_to_main_menu, show_date_selection, show_today_homework, show_tomorrow_homework, show_week_homework
 from handlers.admin_handlers import show_help_menu, how_working_bot, find_mistacke_bot, Wanna_create_homework, write_me
-from handlers.calendar_handlers import handle_calendar_callback, show_date_selection
+# БАГ БЫЛ: show_date_selection импортировалась из двух модулей, второй импорт перезаписывал первый.
+# Переименовываем calendar-версию чтобы избежать конфликта имён.
+from handlers.calendar_handlers import handle_calendar_callback, show_date_selection as show_calendar_date_selection
 from handlers.add_homework import (
     start_add_homework, process_date, process_subject, process_task, 
     process_attachment_text, process_attachment_media, confirm_add_homework, cancel_add_homework

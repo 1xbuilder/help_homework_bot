@@ -13,6 +13,7 @@ class Homework(Base):
     task = Column(Text, nullable=False)
     date_for = Column(Date, nullable=False)
     created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, nullable=True)  # БАГ БЫЛ: поле используется в update_homework, но отсутствовало в модели
     attachment_file_id = Column(String(255), nullable=True)
     attachment_type = Column(String(20), nullable=True)
     

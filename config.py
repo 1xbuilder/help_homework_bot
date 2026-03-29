@@ -1,4 +1,10 @@
-TOKEN = "6029878031:AAEzDzfx7dVmZmGcA-sy5B2c1SqYSR-bRks"
-SUPABASE_URL = "https://cpppvkrvduhdvgutibec.supabase.co"
-SUPABASE_KEY = "sb_publishable_eekjhCteBrBNZsd0MPSGuQ_gUnyHrrZ"
-# ADMIN_IDS = [767496462, 1148528051, 5350177621, 2112224274, 7289021581]
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TOKEN = os.getenv("BOT_TOKEN", "")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+_raw_ids = os.getenv("ADMIN_IDS", "")
+ADMIN_IDS = [int(x.strip()) for x in _raw_ids.split(",") if x.strip().isdigit()]

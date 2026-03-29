@@ -100,7 +100,11 @@ dp.register_message_handler(confirm_add_homework, state=AddHomework.waiting_for_
 # ── Назад ────────────────────────────────────────────────────────
 dp.register_message_handler(back_to_main_menu, lambda m: m.text in ("🔙 Назад", "Назад"))
 
+async def on_startup(dp):
+    from photo_proxy import start_proxy
+    await start_proxy()
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     print("Бот запущен...")
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)

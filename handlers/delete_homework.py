@@ -44,8 +44,6 @@ async def start_delete_homework(message: types.Message, state: FSMContext):
     except Exception as e:
         await message.answer(f"❌ Ошибка: {str(e)}", 
                            reply_markup=get_main_keyboard(message.from_user.id))
-    finally:
-
 # Обработка выбора даты
 async def process_date_selection(message: types.Message, state: FSMContext):
     if message.text == "🔙 Назад":
@@ -93,8 +91,6 @@ async def process_date_selection(message: types.Message, state: FSMContext):
             
         except Exception as e:
             await message.answer(f"❌ Ошибка базы данных: {str(e)}")
-        finally:
-            
     except Exception as e:
         await message.answer("❌ Ошибка формата даты. Попробуй еще раз.")
 
@@ -190,8 +186,6 @@ async def confirm_deletion(message: types.Message, state: FSMContext):
         except Exception as e:
             await message.answer(f"❌ Ошибка базы данных: {str(e)}", 
                                reply_markup=get_main_keyboard(message.from_user.id))
-        finally:
-        
         await state.finish()
     
     else:

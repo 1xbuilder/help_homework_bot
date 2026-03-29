@@ -71,7 +71,6 @@ async def process_start_command(message: types.Message, state: FSMContext):
     except Exception as e:
         await message.answer("❌ Произошла ошибка. Попробуй еще раз /start")
         print(f"Ошибка в process_start_command: {e}")
-    finally:
 
 async def process_user_name(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
@@ -138,8 +137,6 @@ async def process_user_name(message: types.Message, state: FSMContext):
     except Exception as e:
         await message.answer("❌ Произошла ошибка. Попробуй еще раз")
         print(f"Ошибка в process_user_name: {e}")
-    finally:
-
 # Функция для получения информации о пользователе (для других модулей)
 def get_user_info(user_id: int):
     try:
@@ -151,4 +148,6 @@ def get_user_info(user_id: int):
                 'username': user.username
             }
         return None
-    finally:
+    except Exception as e:
+        print(f'Ошибка в get_user_info: {e}')
+        return None

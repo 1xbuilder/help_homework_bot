@@ -123,7 +123,6 @@ async def handle_calendar_callback(callback_query: types.CallbackQuery, state: F
                     
         except Exception as e:
             await callback_query.message.answer(f"❌ Ошибка при загрузке ДЗ: {str(e)}")
-        finally:
         
         # Удаляем календарь после выбора даты
         await callback_query.message.delete()

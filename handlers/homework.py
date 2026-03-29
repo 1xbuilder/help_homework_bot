@@ -230,8 +230,6 @@ async def show_today_homework(message: types.Message):
             
     except Exception as e:
         await message.answer(f"❌ Ошибка при получении ДЗ: {str(e)}")
-    finally:
-
 # Функция для показа ДЗ на завтра
 async def show_tomorrow_homework(message: types.Message):
     try:
@@ -251,8 +249,6 @@ async def show_tomorrow_homework(message: types.Message):
             
     except Exception as e:
         await message.answer(f"❌ Ошибка при получении ДЗ: {str(e)}")
-    finally:
-
 # Функция для показа ДЗ на неделю
 async def show_week_homework(message: types.Message):
     try:
@@ -281,4 +277,3 @@ async def show_week_homework(message: types.Message):
                 
     except Exception as e:
         await message.answer(f"❌ Ошибка при получении ДЗ: {str(e)}")
-    finally:

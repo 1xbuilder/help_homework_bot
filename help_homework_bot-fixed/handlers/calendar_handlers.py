@@ -2,7 +2,6 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime, date, timedelta
-from database.db_session import SessionLocal
 from database.db_operations import get_homework_by_date
 from handlers.homework import send_homework_with_files
 import calendar
@@ -107,7 +106,6 @@ async def handle_calendar_callback(callback_query: types.CallbackQuery, state: F
         await callback_query.answer(f"Загружаем ДЗ на {selected_date.strftime('%d.%m.%Y')}")
         
         # Получаем ДЗ на выбранную дату
-        db = SessionLocal()
         try:
             homeworks = get_homework_by_date(db, selected_date)
             
@@ -126,7 +124,6 @@ async def handle_calendar_callback(callback_query: types.CallbackQuery, state: F
         except Exception as e:
             await callback_query.message.answer(f"❌ Ошибка при загрузке ДЗ: {str(e)}")
         finally:
-            db.close()
         
         # Удаляем календарь после выбора даты
         await callback_query.message.delete()

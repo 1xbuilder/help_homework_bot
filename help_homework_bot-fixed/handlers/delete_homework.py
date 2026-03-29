@@ -3,7 +3,6 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from handlers.start import get_main_keyboard
-from database.db_session import SessionLocal
 from database.db_operations import get_all_homeworks, delete_homework, get_homework_by_id, get_homework_by_date
 from datetime import datetime, date
 from collections import defaultdict
@@ -11,10 +10,9 @@ from states.delete_states import DeleteHomework
 
 # Начинаем процесс удаления ДЗ
 async def start_delete_homework(message: types.Message, state: FSMContext):
-    db = SessionLocal()
     try:
         # Получаем все ДЗ и группируем по датам
-        homeworks = get_all_homeworks(db)
+        homeworks = get_all_homeworks()
         
         if not homeworks:
             await message.answer("❌ В базе нет домашних заданий для удаления.", 
@@ -47,7 +45,6 @@ async def start_delete_homework(message: types.Message, state: FSMContext):
         await message.answer(f"❌ Ошибка: {str(e)}", 
                            reply_markup=get_main_keyboard(message.from_user.id))
     finally:
-        db.close()
 
 # Обработка выбора даты
 async def process_date_selection(message: types.Message, state: FSMContext):
@@ -66,9 +63,8 @@ async def process_date_selection(message: types.Message, state: FSMContext):
         selected_date = datetime.strptime(date_text, "%d.%m.%Y").date()
         
         # Получаем ДЗ на выбранную дату
-        db = SessionLocal()
         try:
-            homeworks = get_homework_by_date(db, selected_date)
+            homeworks = get_homework_by_date(target_date=selected_date)
             
             if not homeworks:
                 await message.answer("❌ На выбранную дату ДЗ не найдено.")
@@ -98,7 +94,6 @@ async def process_date_selection(message: types.Message, state: FSMContext):
         except Exception as e:
             await message.answer(f"❌ Ошибка базы данных: {str(e)}")
         finally:
-            db.close()
             
     except Exception as e:
         await message.answer("❌ Ошибка формата даты. Попробуй еще раз.")
@@ -172,12 +167,11 @@ async def confirm_deletion(message: types.Message, state: FSMContext):
             await state.finish()
             return
         
-        db = SessionLocal()
         try:
-            homework = get_homework_by_id(db, homework_id)
+            homework = get_homework_by_id(homework_id=homework_id)
             
             if homework:
-                success = delete_homework(db, homework_id)
+                success = delete_homework(homework_id=homework_id)
                 
                 if success:
                     await message.answer(
@@ -197,7 +191,6 @@ async def confirm_deletion(message: types.Message, state: FSMContext):
             await message.answer(f"❌ Ошибка базы данных: {str(e)}", 
                                reply_markup=get_main_keyboard(message.from_user.id))
         finally:
-            db.close()
         
         await state.finish()
     

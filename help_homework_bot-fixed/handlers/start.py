@@ -3,7 +3,6 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from config import ADMIN_IDS  # БАГ БЫЛ: закомментировано, все пользователи получали права админа
-from database.db_session import SessionLocal
 from database.db_operations import get_user_by_telegram_id, create_user
 from states.user_states import UserRegistration
 
@@ -24,11 +23,10 @@ def get_main_keyboard(user_id: int):
 
 async def process_start_command(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    db = SessionLocal()
     
     try:
         # Проверяем, есть ли пользователь в базе
-        user = get_user_by_telegram_id(db, user_id)
+        user = get_user_by_telegram_id(telegram_id=user_id)
         
         if user:
             # Пользователь уже зарегистрирован
@@ -74,11 +72,9 @@ async def process_start_command(message: types.Message, state: FSMContext):
         await message.answer("❌ Произошла ошибка. Попробуй еще раз /start")
         print(f"Ошибка в process_start_command: {e}")
     finally:
-        db.close()
 
 async def process_user_name(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    db = SessionLocal()
     
     try:
         if user_id not in temp_users:
@@ -114,7 +110,6 @@ async def process_user_name(message: types.Message, state: FSMContext):
         
         # Создаем пользователя в базе
         new_user = create_user(
-            db=db,
             telegram_id=user_id,
             username=user_data['username'],
             first_name=first_name,
@@ -144,13 +139,11 @@ async def process_user_name(message: types.Message, state: FSMContext):
         await message.answer("❌ Произошла ошибка. Попробуй еще раз")
         print(f"Ошибка в process_user_name: {e}")
     finally:
-        db.close()
 
 # Функция для получения информации о пользователе (для других модулей)
 def get_user_info(user_id: int):
-    db = SessionLocal()
     try:
-        user = get_user_by_telegram_id(db, user_id)
+        user = get_user_by_telegram_id(telegram_id=user_id)
         if user:
             return {
                 'id': user.id,
@@ -159,4 +152,3 @@ def get_user_info(user_id: int):
             }
         return None
     finally:
-        db.close()

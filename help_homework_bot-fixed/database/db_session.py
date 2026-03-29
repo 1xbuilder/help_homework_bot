@@ -1,23 +1,13 @@
+# database/db_session.py
 import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from .models import Base
+from supabase import create_client, Client
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
-if not DATABASE_URL:
-    raise RuntimeError("Переменная DATABASE_URL не задана!")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("Не заданы SUPABASE_URL или SUPABASE_KEY в переменных окружения!")
 
-engine = create_engine(DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-Base.metadata.create_all(bind=engine)
-
-print(f"✅ Подключено к Supabase PostgreSQL")
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+print("✅ Подключено к Supabase через REST API")

@@ -4,7 +4,6 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ContentType
 from states.homework_states import AddHomework
 from handlers.start import get_main_keyboard
 from datetime import datetime, timedelta, date
-from database.db_session import SessionLocal
 from database.db_operations import add_homework_to_db
 import json
 
@@ -240,7 +239,6 @@ async def confirm_add_homework(message: types.Message, state: FSMContext):
             data['attachments'] = user_files[user_id]
         
         # Сохраняем в БД
-        db = SessionLocal()
         try:
             # Преобразуем строку даты в объект date
             date_for = datetime.strptime(data['date_for'], "%Y-%m-%d").date()
@@ -272,9 +270,7 @@ async def confirm_add_homework(message: types.Message, state: FSMContext):
         except Exception as e:
             await message.answer(f"❌ Ошибка: {str(e)}", 
                                reply_markup=get_main_keyboard(message.from_user.id))
-        finally:
-            db.close()
-            
+        
         # Очищаем временные данные
         if user_id in user_files:
             del user_files[user_id]

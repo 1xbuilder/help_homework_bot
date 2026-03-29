@@ -249,7 +249,6 @@ async def confirm_add_homework(message: types.Message, state: FSMContext):
                 attachment_data = json.dumps(data['attachments'])
             
             homework = add_homework_to_db(
-                db=db,
                 subject=data['subject'],
                 task=data['task'],
                 date_for=date_for,

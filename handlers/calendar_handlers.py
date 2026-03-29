@@ -107,7 +107,7 @@ async def handle_calendar_callback(callback_query: types.CallbackQuery, state: F
         
         # Получаем ДЗ на выбранную дату
         try:
-            homeworks = get_homework_by_date(db, selected_date)
+            homeworks = get_homework_by_date(target_date=selected_date)
             
             if not homeworks:
                 await callback_query.message.answer(

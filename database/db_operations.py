@@ -27,6 +27,7 @@ class UserDTO:
         self.username = data.get('username')
         self.first_name = data.get('first_name', '')
         self.last_name = data.get('last_name')
+        self.subgroup = data.get('subgroup')
         self.created_at = data.get('created_at')
 
 
@@ -182,4 +183,15 @@ def create_user(db=None, telegram_id=None, username=None, first_name=None, last_
         return None
     except Exception as e:
         print(f"Ошибка при создании пользователя: {e}")
+        return None
+
+
+def update_user_subgroup(db=None, telegram_id=None, subgroup=None):
+    try:
+        result = supabase.table("users").update({"subgroup": subgroup}).eq("user_id", telegram_id).execute()
+        if result.data:
+            return UserDTO(result.data[0])
+        return None
+    except Exception as e:
+        print(f"Ошибка при обновлении подгруппы: {e}")
         return None

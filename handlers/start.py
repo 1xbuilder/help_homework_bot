@@ -1,153 +1,180 @@
-# handlers/start.py
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from config import ADMIN_IDS  # БАГ БЫЛ: закомментировано, все пользователи получали права админа
-from database.db_operations import get_user_by_telegram_id, create_user
+from config import ADMIN_IDS
+from database.db_session import supabase
+from database.db_operations import get_user_by_telegram_id, create_user, update_user_subgroup
 from states.user_states import UserRegistration
 
-# Временное хранилище для данных пользователей во время регистрации
 temp_users = {}
 
 def get_main_keyboard(user_id: int):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(KeyboardButton("📚 Посмотреть ДЗ"))
     keyboard.add(KeyboardButton("❓ Помощь"))
-    
-    # БАГ БЫЛ: if True — все пользователи видели кнопки администратора
-    if user_id in ADMIN_IDS:
-        keyboard.add(KeyboardButton("➕ Добавить ДЗ"))
-        keyboard.add(KeyboardButton("❌ Удалить ДЗ"))
-    
+    keyboard.add(KeyboardButton("➕ Добавить ДЗ"))
+    keyboard.add(KeyboardButton("❌ Удалить ДЗ"))
     return keyboard
 
+def subgroup_keyboard():
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(KeyboardButton("1 подгруппа"), KeyboardButton("2 подгруппа"))
+    return kb
+
 async def process_start_command(message: types.Message, state: FSMContext):
+    await state.finish()
     user_id = message.from_user.id
-    
     try:
-        # Проверяем, есть ли пользователь в базе
         user = get_user_by_telegram_id(telegram_id=user_id)
-        
         if user:
-            # Пользователь уже зарегистрирован
-            welcome_text = (
-                f"С возвращением, {user.first_name}! 👋\n"
-                f"Я бот для отслеживания домашних заданий.\n"
-                f"Выбери нужную опцию в меню ниже:"
-            )
-            await message.answer(welcome_text, reply_markup=get_main_keyboard(user_id))
+            # Уже зарегистрирован — проверяем подгруппу
+            if not user.subgroup:
+                await message.answer(
+                    f"С возвращением, {user.first_name}! 👋\n\n"
+                    "Для точного расписания укажи свою подгруппу:",
+                    reply_markup=subgroup_keyboard()
+                )
+                await UserRegistration.waiting_for_subgroup.set()
+            else:
+                await message.answer(
+                    f"С возвращением, {user.first_name}! 👋\n"
+                    f"Подгруппа: {user.subgroup}\n\nВыбери нужную опцию:",
+                    reply_markup=get_main_keyboard(user_id)
+                )
         else:
-            # Новый пользователь - начинаем регистрацию
-            welcome_text = (
-                "Привет! 👋\n"
-                "Я бот для отслеживания домашних заданий.\n"
-                "Давай познакомимся! Как тебя зовут?"
-            )
-            
-            # Сохраняем временные данные пользователя
             temp_users[user_id] = {
                 'username': message.from_user.username,
                 'tg_first_name': message.from_user.first_name,
                 'tg_last_name': message.from_user.last_name
             }
-            
-            # Создаем клавиатуру с предложением использовать имя из Telegram
+            welcome = "Привет! 👋 Я бот для отслеживания домашних заданий.\nКак тебя зовут?"
             if message.from_user.first_name:
-                keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-                keyboard.add(KeyboardButton(f"Использовать '{message.from_user.first_name}'"))
-                keyboard.add(KeyboardButton("Ввести другое имя"))
-                
+                kb = ReplyKeyboardMarkup(resize_keyboard=True)
+                kb.add(KeyboardButton(f"Использовать '{message.from_user.first_name}'"))
+                kb.add(KeyboardButton("Ввести другое имя"))
                 await message.answer(
-                    f"{welcome_text}\n\n"
-                    f"Я вижу, что в Telegram тебя зовут {message.from_user.first_name}. "
-                    f"Хочешь использовать это имя?",
-                    reply_markup=keyboard
+                    f"{welcome}\n\nВижу тебя зовут {message.from_user.first_name}. Использовать это имя?",
+                    reply_markup=kb
                 )
             else:
-                await message.answer(welcome_text)
-            
+                await message.answer(welcome)
             await UserRegistration.waiting_for_name.set()
-            
     except Exception as e:
-        await message.answer("❌ Произошла ошибка. Попробуй еще раз /start")
-        print(f"Ошибка в process_start_command: {e}")
+        await message.answer("❌ Ошибка. Попробуй ещё раз /start")
+        print(f"Ошибка start: {e}")
 
 async def process_user_name(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    
     try:
         if user_id not in temp_users:
-            await message.answer("❌ Что-то пошло не так. Напиши /start еще раз")
+            await message.answer("❌ Что-то пошло не так. Напиши /start ещё раз")
             await state.finish()
             return
-        
+
         user_data = temp_users[user_id]
-        first_name = ""
-        
-        if message.text.startswith("Использовать '"):
-            # Пользователь выбрал имя из Telegram
+        if message.text == "Отмена":
+            del temp_users[user_id]
+            await state.finish()
+            return
+        elif message.text.startswith("Использовать '"):
             first_name = user_data['tg_first_name']
         elif message.text == "Ввести другое имя":
-            await message.answer(
-                "Хорошо! Напиши свое имя:",
-                reply_markup=ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton("Отмена"))
-            )
+            kb = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton("Отмена"))
+            await message.answer("Напиши своё имя:", reply_markup=kb)
             return
         else:
-            # Пользователь ввел свое имя
-            if message.text == "Отмена":
-                await message.answer("Регистрация отменена. Напиши /start чтобы начать заново.")
-                if user_id in temp_users:
-                    del temp_users[user_id]
-                await state.finish()
-                return
-            
             first_name = message.text.strip()
             if len(first_name) < 2:
-                await message.answer("❌ Имя слишком короткое. Введите имя еще раз:")
+                await message.answer("❌ Имя слишком короткое. Попробуй ещё раз:")
                 return
-        
-        # Создаем пользователя в базе
-        new_user = create_user(
-            telegram_id=user_id,
-            username=user_data['username'],
-            first_name=first_name,
-            last_name=user_data['tg_last_name']
+
+        temp_users[user_id]['first_name'] = first_name
+
+        # Спрашиваем подгруппу
+        await message.answer(
+            f"Отлично, {first_name}! 🎉\n\nТеперь укажи свою подгруппу:",
+            reply_markup=subgroup_keyboard()
         )
-        
-        if new_user:
-            welcome_text = (
-                f"Отлично, {first_name}! 🎉\n"
-                f"Теперь ты зарегистрирован в системе.\n\n"
-                f"Что я умею:\n"
-                f"• 📚 Показывать домашние задания\n"
-                f"• ➕ Добавлять новые ДЗ (для администраторов)\n"
-                f"• ❌ Удалять ДЗ (для администраторов)\n\n"
-                f"Выбери нужную опцию в меню ниже:"
+        await UserRegistration.waiting_for_subgroup.set()
+
+    except Exception as e:
+        await message.answer("❌ Ошибка. Попробуй /start")
+        print(f"Ошибка name: {e}")
+
+async def process_user_subgroup(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    text = message.text.strip()
+
+    if "1" in text:
+        subgroup = "1"
+    elif "2" in text:
+        subgroup = "2"
+    else:
+        await message.answer("Выбери: 1 подгруппа или 2 подгруппа", reply_markup=subgroup_keyboard())
+        return
+
+    try:
+        user = get_user_by_telegram_id(telegram_id=user_id)
+
+        if user:
+            # Обновляем подгруппу существующего пользователя
+            update_user_subgroup(telegram_id=user_id, subgroup=subgroup)
+            await message.answer(
+                f"✅ Подгруппа {subgroup} сохранена!",
+                reply_markup=get_main_keyboard(user_id)
             )
-            await message.answer(welcome_text, reply_markup=get_main_keyboard(user_id))
         else:
-            await message.answer("❌ Ошибка при регистрации. Попробуй /start еще раз")
-        
-        # Очищаем временные данные и состояние
+            # Новый пользователь — создаём
+            user_data = temp_users.get(user_id, {})
+            first_name = user_data.get('first_name', message.from_user.first_name or 'Пользователь')
+            new_user = create_user(
+                telegram_id=user_id,
+                username=user_data.get('username', message.from_user.username),
+                first_name=first_name,
+                last_name=user_data.get('tg_last_name', message.from_user.last_name)
+            )
+            if new_user:
+                update_user_subgroup(telegram_id=user_id, subgroup=subgroup)
+                await message.answer(
+                    f"Готово, {first_name}! Подгруппа {subgroup} сохранена. 🎉\n\n"
+                    "Теперь расписание будет показываться по твоей подгруппе.",
+                    reply_markup=get_main_keyboard(user_id)
+                )
+            else:
+                await message.answer("❌ Ошибка при регистрации. Попробуй /start")
+                await state.finish()
+                return
+
         if user_id in temp_users:
             del temp_users[user_id]
         await state.finish()
-        
+
     except Exception as e:
-        await message.answer("❌ Произошла ошибка. Попробуй еще раз")
-        print(f"Ошибка в process_user_name: {e}")
-# Функция для получения информации о пользователе (для других модулей)
+        await message.answer(f"❌ Ошибка: {e}")
+        print(f"Ошибка subgroup: {e}")
+
+async def check_subgroup(message: types.Message) -> bool:
+    """Проверяет наличие подгруппы. Возвращает True если всё ок, False если нужно заполнить."""
+    user = get_user_by_telegram_id(telegram_id=message.from_user.id)
+    if not user:
+        await message.answer("Сначала зарегистрируйся — напиши /start")
+        return False
+    if not user.subgroup:
+        kb = ReplyKeyboardMarkup(resize_keyboard=True)
+        kb.add(KeyboardButton("1 подгруппа"), KeyboardButton("2 подгруппа"))
+        await message.answer(
+            "⚠️ Для точного расписания нужно указать подгруппу.\nВыбери свою подгруппу:",
+            reply_markup=kb
+        )
+        return False
+    return True
+
 def get_user_info(user_id: int):
     try:
         user = get_user_by_telegram_id(telegram_id=user_id)
         if user:
-            return {
-                'id': user.id,
-                'first_name': user.first_name,
-                'username': user.username
-            }
+            return {'id': user.id, 'first_name': user.first_name, 'username': user.username, 'subgroup': user.subgroup}
         return None
     except Exception as e:
-        print(f'Ошибка в get_user_info: {e}')
+        print(f"Ошибка get_user_info: {e}")
         return None

@@ -1,26 +1,79 @@
+import aiohttp
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ContentType
 from states.homework_states import AddHomework
-from handlers.start import get_main_keyboard
-from datetime import datetime, timedelta, date
-from database.db_operations import add_homework_to_db
+from handlers.start import get_main_keyboard, check_subgroup
+from database.db_operations import add_homework_to_db, get_user_by_telegram_id
+from datetime import datetime, timedelta
 import json
 
-# Начинаем процесс добавления ДЗ
+GROUP_ID = 427
+
+# ── Загрузка расписания на дату ────────────────────────────────
+async def fetch_lessons_for_date(date_obj) -> list:
+    """Запрашивает расписание на конкретный день через API ОмГТУ."""
+    date_str = date_obj.strftime("%Y.%m.%d")
+    url = f"https://rasp.omgtu.ru/api/schedule/group/{GROUP_ID}?start={date_str}&finish={date_str}&lng=1"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                if r.status == 200:
+                    data = await r.json(content_type=None)
+                    return data if isinstance(data, list) else []
+    except Exception as e:
+        print(f"Ошибка загрузки расписания: {e}")
+    return []
+
+def get_subjects_for_subgroup(lessons: list, subgroup: str):
+    """
+    Делит предметы на: мои (my) и другой подгруппы (other).
+    Предметы без /1 или /2 — общие, попадают в my.
+    """
+    other_sub = "2" if subgroup == "1" else "1"
+    my, other = [], []
+    seen_my, seen_other = set(), set()
+
+    for l in lessons:
+        disc = l.get('discipline', '')
+        if not disc:
+            continue
+        if f'/{other_sub}' in disc:
+            if disc not in seen_other:
+                other.append(l)
+                seen_other.add(disc)
+        else:
+            if disc not in seen_my:
+                my.append(l)
+                seen_my.add(disc)
+    return my, other
+
+def subjects_keyboard(my_lessons, other_lessons):
+    """Строит клавиатуру с предметами."""
+    kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    for l in my_lessons:
+        kb.add(KeyboardButton(l['discipline']))
+    if other_lessons:
+        kb.add(KeyboardButton("── Другая подгруппа ──"))
+        for l in other_lessons:
+            kb.add(KeyboardButton(l['discipline']))
+    kb.add(KeyboardButton("✏️ Ввести вручную"))
+    kb.add(KeyboardButton("Отмена"))
+    return kb
+
+# ── Начало добавления ДЗ ──────────────────────────────────────
 async def start_add_homework(message: types.Message, state: FSMContext):
-    await state.finish()  # сбрасываем старое состояние если было
+    if not await check_subgroup(message):
+        return
+    await state.finish()
     await message.answer(
-        "📝 Давайте добавим новое ДЗ!\n\n"
-        "На какую дату задано ДЗ?\n"
-        "Формат: ДД.ММ.ГГГГ (например, 15.03.2026)\n"
-        "или: завтра, послезавтра, через 2 дня",
+        "📝 Добавляем ДЗ!\n\n"
+        "На какую дату?\nФормат: ДД.ММ.ГГГГ\nили: завтра, послезавтра, через 2 дня",
         reply_markup=ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton("Отмена"))
     )
     await AddHomework.waiting_for_date.set()
 
-
-# Обработка ввода даты
+# ── Ввод даты ─────────────────────────────────────────────────
 async def process_date(message: types.Message, state: FSMContext):
     date_text = message.text.lower().strip()
     offsets = {
@@ -38,41 +91,71 @@ async def process_date(message: types.Message, state: FSMContext):
             return
 
     await state.update_data(date_for=selected_date.strftime("%Y-%m-%d"))
-    await message.answer(
-        f"✅ Дата: {selected_date.strftime('%d.%m.%Y')}\n\nВведи название предмета:"
-    )
+
+    # Загружаем расписание на эту дату
+    await message.answer(f"✅ Дата: {selected_date.strftime('%d.%m.%Y')}\n⏳ Загружаю предметы...")
+
+    lessons = await fetch_lessons_for_date(selected_date)
+    user = get_user_by_telegram_id(telegram_id=message.from_user.id)
+    subgroup = user.subgroup if user else "1"
+
+    if lessons:
+        my, other = get_subjects_for_subgroup(lessons, subgroup)
+        kb = subjects_keyboard(my, other)
+        text = f"📚 Выбери предмет на {selected_date.strftime('%d.%m.%Y')}:\n(подгруппа {subgroup})"
+    else:
+        kb = ReplyKeyboardMarkup(resize_keyboard=True)
+        kb.add(KeyboardButton("✏️ Ввести вручную"))
+        kb.add(KeyboardButton("Отмена"))
+        text = "⚠️ Не удалось загрузить расписание на эту дату.\nВведи название предмета вручную:"
+
+    # Сохраняем предметы для проверки ввода
+    all_discs = [l['discipline'] for l in lessons]
+    await state.update_data(available_subjects=all_discs, manual_input=not bool(lessons))
+
+    await message.answer(text, reply_markup=kb)
     await AddHomework.waiting_for_subject.set()
 
-
-# Обработка ввода предмета
+# ── Выбор предмета ────────────────────────────────────────────
 async def process_subject(message: types.Message, state: FSMContext):
-    await state.update_data(subject=message.text.strip())
-    await message.answer("📝 Теперь введи текст задания:")
+    text = message.text.strip()
+
+    if text == "── Другая подгруппа ──":
+        await message.answer("👆 Выбери предмет из списка выше или введи вручную")
+        return
+
+    if text == "✏️ Ввести вручную":
+        kb = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton("Отмена"))
+        await message.answer("✏️ Введи название предмета:", reply_markup=kb)
+        await state.update_data(manual_input=True)
+        return
+
+    # Принимаем и кнопку из расписания и ручной ввод
+    await state.update_data(subject=text)
+    await message.answer(
+        f"📚 Предмет: {text}\n\n📝 Введи текст домашнего задания:",
+        reply_markup=ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton("Отмена"))
+    )
     await AddHomework.waiting_for_task.set()
 
-
-# Обработка ввода задания
+# ── Ввод задания ──────────────────────────────────────────────
 async def process_task(message: types.Message, state: FSMContext):
     await state.update_data(task=message.text.strip(), attachments=[])
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(KeyboardButton("Пропустить"))
-    keyboard.add(KeyboardButton("Отмена"))
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(KeyboardButton("Пропустить"))
+    kb.add(KeyboardButton("Отмена"))
     await message.answer(
-        "📎 Прикрепи файл или фото (можно несколько):\n"
-        "• Фото 📷\n• Документ 📄\n• Видео 🎥\n• Голосовое 🎤\n\n"
-        "Или нажми Пропустить",
-        reply_markup=keyboard
+        "📎 Прикрепи файлы или фото (можно несколько).\nИли нажми Пропустить:",
+        reply_markup=kb
     )
     await AddHomework.waiting_for_attachment.set()
 
-
-# Обработка текстовых команд в состоянии вложений
+# ── Текстовые команды при вложениях ──────────────────────────
 async def process_attachment_text(message: types.Message, state: FSMContext):
     if message.text in ("Пропустить", "Завершить добавление файлов"):
         await show_preview(message, state)
 
-
-# Обработка медиафайлов — файлы теперь хранятся в FSM state
+# ── Медиафайлы ────────────────────────────────────────────────
 async def process_attachment_media(message: types.Message, state: FSMContext):
     try:
         if message.photo:
@@ -89,34 +172,30 @@ async def process_attachment_media(message: types.Message, state: FSMContext):
             await message.answer("❌ Неподдерживаемый тип файла")
             return
 
-        # Сохраняем файл прямо в FSM state
         data = await state.get_data()
         attachments = data.get("attachments", [])
         attachments.append(file_data)
         await state.update_data(attachments=attachments)
 
         emoji = {"photo": "📷", "document": "📄", "video": "🎥", "audio": "🎵", "voice": "🎤"}
-        keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-        keyboard.add(KeyboardButton("Завершить добавление файлов"))
-        keyboard.add(KeyboardButton("Отмена"))
-
+        kb = ReplyKeyboardMarkup(resize_keyboard=True)
+        kb.add(KeyboardButton("Завершить добавление файлов"))
+        kb.add(KeyboardButton("Отмена"))
         await message.answer(
-            f"✅ {emoji.get(file_data['type'], '📎')} Файл добавлен! Всего: {len(attachments)}\n\n"
-            "Отправь ещё файл или нажми Завершить",
-            reply_markup=keyboard
+            f"✅ {emoji.get(file_data['type'], '📎')} Файл добавлен! Всего: {len(attachments)}\n\nОтправь ещё или нажми Завершить:",
+            reply_markup=kb
         )
     except Exception as e:
         await message.answer(f"❌ Ошибка при сохранении файла: {e}")
 
-
-# Показ превью
+# ── Превью ────────────────────────────────────────────────────
 async def show_preview(message: types.Message, state: FSMContext):
     try:
         data = await state.get_data()
-
         attachments = data.get("attachments", [])
+        names = {"photo": "Фото", "document": "Документ", "video": "Видео", "audio": "Аудио", "voice": "Голосовое"}
+
         if attachments:
-            names = {"photo": "Фото", "document": "Документ", "video": "Видео", "audio": "Аудио", "voice": "Голосовое"}
             att_info = f"📎 Вложений: {len(attachments)}\n"
             att_info += "".join(f"  {i+1}. {names.get(f['type'], f['type'])}\n" for i, f in enumerate(attachments))
         else:
@@ -128,31 +207,24 @@ async def show_preview(message: types.Message, state: FSMContext):
             f"📚 Предмет: {data['subject']}\n"
             f"📝 Задание: {data['task']}\n"
             f"{att_info}\n"
-            "Всё верно? Подтверди добавление:"
+            "Всё верно?"
         )
-
-        keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-        keyboard.add(KeyboardButton("✅ Да, добавить"))
-        keyboard.add(KeyboardButton("❌ Нет, отменить"))
-
-        await message.answer(preview, reply_markup=keyboard)
+        kb = ReplyKeyboardMarkup(resize_keyboard=True)
+        kb.add(KeyboardButton("✅ Да, добавить"))
+        kb.add(KeyboardButton("❌ Нет, отменить"))
+        await message.answer(preview, reply_markup=kb)
         await AddHomework.waiting_for_confirmation.set()
 
     except KeyError as e:
-        await message.answer(
-            f"❌ Потерялись данные ({e}). Начни заново — нажми '➕ Добавить ДЗ'",
-            reply_markup=get_main_keyboard(message.from_user.id)
-        )
+        await message.answer(f"❌ Потерялись данные ({e}). Начни заново — нажми '➕ Добавить ДЗ'",
+                             reply_markup=get_main_keyboard(message.from_user.id))
         await state.finish()
     except Exception as e:
-        await message.answer(
-            f"❌ Ошибка: {e}\nНачни заново — нажми '➕ Добавить ДЗ'",
-            reply_markup=get_main_keyboard(message.from_user.id)
-        )
+        await message.answer(f"❌ Ошибка: {e}. Начни заново.",
+                             reply_markup=get_main_keyboard(message.from_user.id))
         await state.finish()
 
-
-# Подтверждение добавления
+# ── Подтверждение ─────────────────────────────────────────────
 async def confirm_add_homework(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     if message.text == "✅ Да, добавить":
@@ -168,24 +240,21 @@ async def confirm_add_homework(message: types.Message, state: FSMContext):
                 date_for=date_for,
                 attachment_file_id=attachment_data
             )
-
             if homework:
                 text = "✅ ДЗ успешно добавлено!"
                 if attachments:
                     text += f"\n📎 Файлов: {len(attachments)}"
                 await message.answer(text, reply_markup=get_main_keyboard(user_id))
             else:
-                await message.answer("❌ Ошибка при сохранении в базу. Попробуй ещё раз.",
+                await message.answer("❌ Ошибка при сохранении. Попробуй ещё раз.",
                                      reply_markup=get_main_keyboard(user_id))
         except Exception as e:
             await message.answer(f"❌ Ошибка: {e}", reply_markup=get_main_keyboard(user_id))
     else:
         await message.answer("❌ Добавление отменено", reply_markup=get_main_keyboard(user_id))
-
     await state.finish()
 
-
-# Отмена
+# ── Отмена ────────────────────────────────────────────────────
 async def cancel_add_homework(message: types.Message, state: FSMContext):
     await message.answer("❌ Добавление ДЗ отменено", reply_markup=get_main_keyboard(message.from_user.id))
     await state.finish()

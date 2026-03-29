@@ -2,7 +2,6 @@ from aiogram import types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from handlers.start import get_main_keyboard
 from datetime import datetime, timedelta, date
-from database.db_session import SessionLocal
 from database.db_operations import get_today_homework, get_tomorrow_homework, get_week_homework, get_homework_by_date
 import json
 
@@ -216,9 +215,8 @@ async def send_remaining_files(message, documents, videos, audios, voices, subje
 
 # Функция для показа ДЗ на сегодня
 async def show_today_homework(message: types.Message):
-    db = SessionLocal()
     try:
-        homeworks = get_today_homework(db)
+        homeworks = get_today_homework()
         
         if not homeworks:
             await message.answer("📝 На сегодня домашних заданий нет!", 
@@ -233,13 +231,11 @@ async def show_today_homework(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при получении ДЗ: {str(e)}")
     finally:
-        db.close()
 
 # Функция для показа ДЗ на завтра
 async def show_tomorrow_homework(message: types.Message):
-    db = SessionLocal()
     try:
-        homeworks = get_tomorrow_homework(db)
+        homeworks = get_tomorrow_homework()
         
         if not homeworks:
             tomorrow = (datetime.now() + timedelta(days=1)).strftime('%d.%m.%Y')
@@ -256,13 +252,11 @@ async def show_tomorrow_homework(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при получении ДЗ: {str(e)}")
     finally:
-        db.close()
 
 # Функция для показа ДЗ на неделю
 async def show_week_homework(message: types.Message):
-    db = SessionLocal()
     try:
-        homeworks = get_week_homework(db)
+        homeworks = get_week_homework()
         
         if not homeworks:
             await message.answer("📝 На эту неделю домашних заданий нет!", 
@@ -288,4 +282,3 @@ async def show_week_homework(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при получении ДЗ: {str(e)}")
     finally:
-        db.close()

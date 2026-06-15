@@ -107,5 +107,7 @@ async def on_startup(dp):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    print("Бот запущен...")
+    from config import SUPABASE_URL
+    logging.warning(f"STARTUP: бот стартует, база = {SUPABASE_URL}")
+    print("Бот запущен...", flush=True)
     executor.start_polling(dp, skip_updates=True, on_startup=on_startup)

@@ -7,8 +7,10 @@ class GroupAdmin(StatesGroup):
 
 
 class GlobalAdmin(StatesGroup):
-    """Глобальная админка (admin): выдача create_group-ссылок, модераторы."""
-    menu = State()
-    waiting_for_institution_choice = State()  # к какому заведению привязать создаваемую группу
-    waiting_for_new_institution = State()     # ввод названия нового заведения
-    waiting_for_moderator_id = State()        # назначение модератора по Telegram ID
+    """Глобальная админка (admin)."""
+    waiting_for_institution_name     = State()  # ввод названия нового заведения
+    waiting_for_institution_city     = State()  # ввод города
+    waiting_for_institution_provider = State()  # ввод провайдера расписания
+    waiting_for_schedule_id          = State()  # external_schedule_id для группы
+    waiting_for_user_search          = State()  # поиск пользователя по имени
+    waiting_for_moderator_id         = State()  # назначение модератора по ID

@@ -30,10 +30,13 @@ from handlers.add_homework import (start_add_homework, process_date, process_sub
 from handlers.delete_homework import (start_delete_homework, process_date_selection,
                                        process_homework_selection, confirm_deletion)
 from handlers.admin_panel import (open_group_admin, open_global_admin,
-                                   group_admin_callback, global_admin_callback)
+                                   group_admin_callback, global_admin_callback,
+                                   process_institution_name, process_institution_city,
+                                   process_institution_provider, process_user_search)
 from handlers.profile import (open_profile, profile_callback, process_new_name)
 from states.homework_states import AddHomework
 from states.user_states import UserRegistration, Onboarding, Profile
+from states.admin_states import GlobalAdmin
 from states.delete_states import DeleteHomework
 
 # ── Команды (всегда первый приоритет, в любом состоянии) ─────────
@@ -62,10 +65,10 @@ dp.register_message_handler(show_help_menu,        lambda m: m.text == "❓ По
 dp.register_message_handler(open_group_admin,      lambda m: m.text == "⚙️ Управление группой", state="*")
 
 # ── Помощь ───────────────────────────────────────────────────────
-dp.register_message_handler(how_working_bot,     lambda m: m.text == "ℹ️ Как работает бот?")
-dp.register_message_handler(find_mistacke_bot,   lambda m: m.text == "🐛 Нашел ошибку")
-dp.register_message_handler(Wanna_create_homework,lambda m: m.text == "👨‍💼 Хочу заполнять ДЗ")
-dp.register_message_handler(write_me,            lambda m: m.text == "💬 Написать в поддержку")
+dp.register_message_handler(how_working_bot,     lambda m: m.text == "Как работает бот")
+dp.register_message_handler(find_mistacke_bot,   lambda m: m.text == "Сообщить об ошибке")
+dp.register_message_handler(Wanna_create_homework,lambda m: m.text == "Хочу заполнять ДЗ")
+dp.register_message_handler(write_me,            lambda m: m.text == "Связаться со старостой")
 
 # ── Просмотр ДЗ ──────────────────────────────────────────────────
 dp.register_message_handler(show_today_homework,    lambda m: m.text == "Сегодня")
@@ -80,7 +83,11 @@ dp.register_message_handler(confirm_deletion,        state=DeleteHomework.waitin
 
 # ── Админки (коллбэки; команды зарегистрированы выше) ────────────
 dp.register_callback_query_handler(group_admin_callback,  lambda c: c.data.startswith('ga_'), state="*")
-dp.register_callback_query_handler(global_admin_callback, lambda c: c.data.startswith('gl_'), state="*")
+dp.register_callback_query_handler(global_admin_callback, lambda c: c.data.startswith('adm_'), state="*")
+dp.register_message_handler(process_institution_name,     state=GlobalAdmin.waiting_for_institution_name)
+dp.register_message_handler(process_institution_city,     state=GlobalAdmin.waiting_for_institution_city)
+dp.register_message_handler(process_institution_provider, state=GlobalAdmin.waiting_for_institution_provider)
+dp.register_message_handler(process_user_search,          state=GlobalAdmin.waiting_for_user_search)
 
 # ── Календарь ────────────────────────────────────────────────────
 dp.register_callback_query_handler(

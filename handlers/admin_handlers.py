@@ -2,17 +2,16 @@ from aiogram import types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from handlers.start import get_main_keyboard
 from database.db_operations import (
-    get_user_by_telegram_id, get_group_by_id,
-    list_group_members, can_edit_homework,
+    get_user_by_telegram_id, get_group_by_id, list_group_members,
 )
 
 
 def _help_keyboard():
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add(KeyboardButton("ℹ️ Как работает бот?"))
-    kb.add(KeyboardButton("🐛 Нашел ошибку"))
-    kb.add(KeyboardButton("👨‍💼 Хочу заполнять ДЗ"))
-    kb.add(KeyboardButton("💬 Написать в поддержку"))
+    kb.add(KeyboardButton("Как работает бот"))
+    kb.add(KeyboardButton("Сообщить об ошибке"))
+    kb.add(KeyboardButton("Хочу заполнять ДЗ"))
+    kb.add(KeyboardButton("Связаться со старостой"))
     kb.add(KeyboardButton("🔙 Назад"))
     return kb
 
@@ -23,9 +22,8 @@ def _back_keyboard():
     return kb
 
 
-def _get_owner_contact(user_id: int):
-    """Возвращает (имя, @username|None) старосты активной группы пользователя
-    или None, если пользователь не в группе / старосты нет."""
+def _owner_contact(user_id: int):
+    """(имя_группы, имя_старосты, @username|None) или None если не в группе."""
     user = get_user_by_telegram_id(telegram_id=user_id)
     if not user or not user.active_group_id:
         return None
@@ -35,97 +33,70 @@ def _get_owner_contact(user_id: int):
     owners = list_group_members(user.active_group_id, role="owner")
     if not owners:
         return (group.name, None, None)
-    owner_member = owners[0]
-    owner_user = get_user_by_telegram_id(telegram_id=owner_member.user_id)
-    if not owner_user:
+    owner = get_user_by_telegram_id(telegram_id=owners[0].user_id)
+    if not owner:
         return (group.name, None, None)
-    handle = f"@{owner_user.username}" if owner_user.username else None
-    return (group.name, owner_user.first_name, handle)
+    handle = f"@{owner.username}" if owner.username else None
+    return (group.name, owner.first_name, handle)
 
 
 def _owner_line(user_id: int) -> str:
-    """Строка с контактом старосты для вставки в тексты."""
-    info = _get_owner_contact(user_id)
+    info = _owner_contact(user_id)
     if info is None:
-        return ("Ты пока не в группе. Попроси у старосты своей группы "
-                "ссылку-приглашение или напиши /start.")
+        return "Ты пока не в группе. Чтобы вступить, нужна ссылка-приглашение от старосты."
     group_name, owner_name, handle = info
     if handle:
-        return f"Обратись к старосте группы «{group_name}»: {owner_name} ({handle})."
-    elif owner_name:
-        return (f"Староста группы «{group_name}» — {owner_name}. "
-                "Напиши ему в общем чате группы (у него не задан username).")
-    else:
-        return (f"В группе «{group_name}» пока не назначен староста с контактом. "
-                "Спроси одногруппников.")
+        return f"Староста группы «{group_name}» — {owner_name}, {handle}."
+    if owner_name:
+        return f"Староста группы «{group_name}» — {owner_name}. Напиши ему в чате группы."
+    return f"В группе «{group_name}» пока нет старосты с контактом."
 
 
 async def show_help_menu(message: types.Message):
-    help_text = (
-        "🆘 <b>Центр помощи</b>\n\n"
-        "Здесь ты можешь:\n"
-        "• 📖 Узнать, как пользоваться ботом\n"
-        "• 🐛 Сообщить об ошибке\n"
-        "• 👨‍💼 Узнать, как получить права на заполнение ДЗ\n"
-        "• 💬 Связаться со старостой\n\n"
-        "<i>Выбери нужный вариант ниже 👇</i>"
+    text = (
+        "Помощь\n\n"
+        "Выбери раздел ниже."
     )
-    await message.answer(help_text, reply_markup=_help_keyboard(), parse_mode="HTML")
+    await message.answer(text, reply_markup=_help_keyboard())
 
 
 async def how_working_bot(message: types.Message):
-    explanation = (
-        "🤖 <b>Как работает бот?</b>\n\n"
-        "• Нажми <b>📚 Посмотреть ДЗ</b>, чтобы увидеть задания своей группы\n"
-        "• Выбери период: сегодня, завтра или конкретную дату\n"
-        "• Получай ДЗ с файлами и описаниями\n\n"
-        "✏️ <b>Заполнение ДЗ</b> доступно старосте и его помощникам:\n"
-        "• <b>➕ Добавить ДЗ</b> — дата, предмет, описание, файлы\n"
-        "• <b>❌ Удалить ДЗ</b> — убрать ошибочное задание\n\n"
-        "📅 <b>Календарь</b> — смотри ДЗ на любую дату.\n\n"
-        "⚙️ <b>Для старост</b> — команда /group:\n"
-        "• пригласить одногруппников по ссылке\n"
-        "• назначить помощников\n\n"
-        "<i>Каждый видит ДЗ только своей группы.</i>"
+    text = (
+        "Как работает бот\n\n"
+        "Бот хранит домашние задания твоей группы.\n\n"
+        "Посмотреть ДЗ — задания на сегодня, завтра или выбранную дату, "
+        "вместе с прикреплёнными файлами.\n\n"
+        "Добавление и удаление заданий доступно старосте и его помощникам.\n\n"
+        "Если ты в нескольких группах — переключайся между ними в профиле. "
+        "Бот всегда показывает задания активной группы."
     )
-    await message.answer(explanation, reply_markup=_back_keyboard(), parse_mode="HTML")
+    await message.answer(text, reply_markup=_back_keyboard())
 
 
 async def find_mistacke_bot(message: types.Message):
-    error_text = (
-        "🐛 <b>Нашёл ошибку?</b>\n\n"
-        "Спасибо, что помогаешь! 🙏\n\n"
-        "<b>Опиши, что случилось:</b>\n"
-        "• 📱 Что ты делал, когда возникла ошибка?\n"
-        "• 📝 Какое сообщение увидел?\n"
-        "• 🖼️ Если есть скриншот — приложи его\n\n"
-        f"{_owner_line(message.from_user.id)}\n"
-        "Староста передаст проблему дальше, если нужно."
+    text = (
+        "Сообщить об ошибке\n\n"
+        "Опиши, что произошло: что ты делал и какое сообщение увидел. "
+        "Если есть скриншот — приложи его.\n\n"
+        + _owner_line(message.from_user.id)
     )
-    await message.answer(error_text, reply_markup=_back_keyboard(), parse_mode="HTML")
+    await message.answer(text, reply_markup=_back_keyboard())
 
 
 async def Wanna_create_homework(message: types.Message):
-    admin_text = (
-        "👨‍💼 <b>Хочешь заполнять ДЗ?</b>\n\n"
-        "Права на добавление и удаление ДЗ выдаёт <b>староста твоей группы</b> — "
-        "он может назначить тебя помощником.\n\n"
-        "<b>Что делать:</b>\n"
-        f"1. {_owner_line(message.from_user.id)}\n"
-        "2. Попроси назначить тебя помощником.\n\n"
-        "<b>После этого ты сможешь:</b>\n"
-        "• ➕ Добавлять домашние задания\n"
-        "• ❌ Удалять ошибочные ДЗ\n\n"
-        "<i>Староста делает это в своей панели командой /group.</i>"
+    text = (
+        "Как получить право заполнять ДЗ\n\n"
+        "Добавлять и удалять задания может староста группы и назначенные им помощники.\n\n"
+        "Чтобы стать помощником, обратись к старосте своей группы.\n\n"
+        + _owner_line(message.from_user.id)
     )
-    await message.answer(admin_text, reply_markup=_back_keyboard(), parse_mode="HTML")
+    await message.answer(text, reply_markup=_back_keyboard())
 
 
 async def write_me(message: types.Message):
-    support_text = (
-        "💬 <b>Связь со старостой</b>\n\n"
-        "По вопросам про ДЗ, расписание и доступ обращайся к старосте своей группы.\n\n"
-        f"{_owner_line(message.from_user.id)}\n\n"
-        "<i>Староста управляет группой и помощниками.</i>"
+    text = (
+        "Связаться со старостой\n\n"
+        "По вопросам о заданиях, расписании и доступе пиши старосте своей группы.\n\n"
+        + _owner_line(message.from_user.id)
     )
-    await message.answer(support_text, reply_markup=_back_keyboard(), parse_mode="HTML")
+    await message.answer(text, reply_markup=_back_keyboard())

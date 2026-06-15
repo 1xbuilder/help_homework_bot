@@ -274,11 +274,26 @@ async def process_invite_code_input(message: types.Message, state: FSMContext):
     await handle_invite_code(message, state, code)
 
 
+async def cancel_any_state(message: types.Message, state: FSMContext):
+    """Универсальный выход из любого состояния по /cancel."""
+    await state.finish()
+    user = get_user_by_telegram_id(telegram_id=message.from_user.id)
+    if user and user.active_group_id:
+        await message.answer("Отменено.", reply_markup=get_main_keyboard(message.from_user.id))
+    else:
+        await message.answer("Отменено. Напиши /start, чтобы начать.")
+
+
 # ── Создание группы старостой ──────────────────────────────────────────────────
 
 async def process_group_name(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     name = message.text.strip()
+    # Команда вместо названия — выходим из создания группы.
+    if name.startswith("/"):
+        await state.finish()
+        await message.answer("Создание группы отменено. Повтори команду ещё раз.")
+        return
     if len(name) < 2:
         await message.answer("❌ Слишком короткое название. Введи название группы:")
         return

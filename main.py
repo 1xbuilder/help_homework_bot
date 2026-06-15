@@ -16,7 +16,7 @@ dp = Dispatcher(bot, storage=storage)
 from handlers.start import (process_start_command, get_main_keyboard,
                              process_user_name, process_user_subgroup,
                              process_invite_code_input, process_group_name,
-                             check_active_group)
+                             cancel_any_state, check_active_group)
 from handlers.homework import (show_homework_menu, back_to_main_menu,
                                 show_date_selection, show_today_homework,
                                 show_tomorrow_homework, show_week_homework)
@@ -39,6 +39,7 @@ from states.delete_states import DeleteHomework
 dp.register_message_handler(process_start_command, commands=['start'], state="*")
 dp.register_message_handler(open_group_admin,  commands=['group'], state="*")
 dp.register_message_handler(open_global_admin, commands=['admin'], state="*")
+dp.register_message_handler(cancel_any_state,   commands=['cancel'], state="*")
 
 # ── Регистрация и онбординг (имя -> код/создание группы -> подгруппа) ──
 dp.register_message_handler(process_user_name,        state=UserRegistration.waiting_for_name)
@@ -107,6 +108,8 @@ async def on_startup(dp):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    # httpx логирует каждый запрос к Supabase — приглушаем, чтобы не засорять логи.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     from config import SUPABASE_URL
     logging.warning(f"STARTUP: бот стартует, база = {SUPABASE_URL}")
     print("Бот запущен...", flush=True)

@@ -219,7 +219,13 @@ async def process_user_name(message: types.Message, state: FSMContext):
         last_name=data.get('tg_last_name'),
     )
     if not user:
-        await message.answer("❌ Ошибка при регистрации. Попробуй /start")
+        from database import db_operations as _ops
+        reason = _ops.LAST_ERROR or "неизвестная причина"
+        await message.answer(
+            "❌ Ошибка при регистрации.\n\n"
+            f"Причина: {reason}\n\n"
+            "Попробуй /start"
+        )
         await state.finish()
         return
 

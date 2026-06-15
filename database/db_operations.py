@@ -163,14 +163,28 @@ def get_user_by_telegram_id(db=None, telegram_id=None):
         return None
 
 
+LAST_ERROR = None  # текст последней ошибки БД (для отладки регистрации)
+
+
 def create_user(db=None, telegram_id=None, username=None, first_name=None, last_name=None):
+    global LAST_ERROR
+    LAST_ERROR = None
     try:
         data = {"user_id": telegram_id, "username": username,
                 "first_name": first_name or "", "last_name": last_name,
                 "global_role": "user"}
         r = supabase.table("users").insert(data).execute()
-        return UserDTO(r.data[0]) if r.data else None
+        if r.data:
+            return UserDTO(r.data[0])
+        # Вставка могла пройти, но ответ пуст (например из-за RLS на возврат строки).
+        # Перечитываем пользователя — если он есть, регистрация удалась.
+        existing = get_user_by_telegram_id(telegram_id=telegram_id)
+        if existing:
+            return existing
+        LAST_ERROR = "insert вернул пустой ответ и пользователь не найден при перечитывании"
+        return None
     except Exception as e:
+        LAST_ERROR = str(e)
         print(f"Ошибка create_user: {e}")
         return None
 

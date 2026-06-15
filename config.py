@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
 
-# Загружаем .env из корня проекта (если есть). На хостинге переменные обычно
-# заданы в окружении напрямую — тогда .env не нужен, load_dotenv просто ничего не сделает.
-load_dotenv()
+# override=False: переменные, уже заданные в окружении (на хостинге — из панели),
+# имеют приоритет над .env-файлом. Так .env не перебьёт настройки сервера.
+load_dotenv(override=False)
 
 TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TOKEN") or os.getenv("API_TOKEN", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")

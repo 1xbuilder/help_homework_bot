@@ -1,6 +1,6 @@
 from aiogram import types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from handlers.start import get_main_keyboard
+from handlers.start import get_main_keyboard, check_active_group
 from datetime import datetime, timedelta, date
 from database.db_operations import get_today_homework, get_tomorrow_homework, get_week_homework, get_homework_by_date
 import json
@@ -216,7 +216,10 @@ async def send_remaining_files(message, documents, videos, audios, voices, subje
 # Функция для показа ДЗ на сегодня
 async def show_today_homework(message: types.Message):
     try:
-        homeworks = get_today_homework()
+        group_id = await check_active_group(message)
+        if not group_id:
+            return
+        homeworks = get_today_homework(group_id=group_id)
         
         if not homeworks:
             await message.answer("📝 На сегодня домашних заданий нет!", 
@@ -233,7 +236,10 @@ async def show_today_homework(message: types.Message):
 # Функция для показа ДЗ на завтра
 async def show_tomorrow_homework(message: types.Message):
     try:
-        homeworks = get_tomorrow_homework()
+        group_id = await check_active_group(message)
+        if not group_id:
+            return
+        homeworks = get_tomorrow_homework(group_id=group_id)
         
         if not homeworks:
             tomorrow = (datetime.now() + timedelta(days=1)).strftime('%d.%m.%Y')
@@ -252,7 +258,10 @@ async def show_tomorrow_homework(message: types.Message):
 # Функция для показа ДЗ на неделю
 async def show_week_homework(message: types.Message):
     try:
-        homeworks = get_week_homework()
+        group_id = await check_active_group(message)
+        if not group_id:
+            return
+        homeworks = get_week_homework(group_id=group_id)
         
         if not homeworks:
             await message.answer("📝 На эту неделю домашних заданий нет!", 

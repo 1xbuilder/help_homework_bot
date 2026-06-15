@@ -1,3 +1,4 @@
 aiogram==2.25.1
-supabase
-python-dotenv
+supabase==2.24.0
+python-dotenv==1.2.1
+aiohttp

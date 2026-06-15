@@ -2,7 +2,7 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime, date, timedelta
-from database.db_operations import get_homework_by_date
+from database.db_operations import get_homework_by_date, get_user_by_telegram_id
 from handlers.homework import send_homework_with_files
 import calendar
 
@@ -105,9 +105,15 @@ async def handle_calendar_callback(callback_query: types.CallbackQuery, state: F
         
         await callback_query.answer(f"Загружаем ДЗ на {selected_date.strftime('%d.%m.%Y')}")
         
-        # Получаем ДЗ на выбранную дату
+        # Получаем ДЗ на выбранную дату (только для активной группы пользователя)
         try:
-            homeworks = get_homework_by_date(target_date=selected_date)
+            user = get_user_by_telegram_id(telegram_id=callback_query.from_user.id)
+            if not user or not user.active_group_id:
+                await callback_query.message.answer(
+                    "⚠️ Ты не в группе. Введи код приглашения или напиши /start"
+                )
+                return
+            homeworks = get_homework_by_date(group_id=user.active_group_id, target_date=selected_date)
             
             if not homeworks:
                 await callback_query.message.answer(

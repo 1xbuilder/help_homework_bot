@@ -2,8 +2,8 @@
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from handlers.start import get_main_keyboard
-from database.db_operations import get_all_homeworks, delete_homework, get_homework_by_id, get_homework_by_date
+from handlers.start import get_main_keyboard, check_active_group
+from database.db_operations import get_all_homeworks, delete_homework, get_homework_by_id, get_homework_by_date, can_edit_homework
 from datetime import datetime, date
 from collections import defaultdict
 from states.delete_states import DeleteHomework
@@ -11,8 +11,18 @@ from states.delete_states import DeleteHomework
 # Начинаем процесс удаления ДЗ
 async def start_delete_homework(message: types.Message, state: FSMContext):
     try:
-        # Получаем все ДЗ и группируем по датам
-        homeworks = get_all_homeworks()
+        group_id = await check_active_group(message)
+        if not group_id:
+            return
+        # Проверка прав: удалять могут только owner/helper или глобальные admin/moderator.
+        if not can_edit_homework(message.from_user.id, group_id):
+            await message.answer(
+                "🔒 Удалять ДЗ могут только староста и его помощники.",
+                reply_markup=get_main_keyboard(message.from_user.id)
+            )
+            return
+        # Получаем все ДЗ своей группы и группируем по датам
+        homeworks = get_all_homeworks(group_id=group_id)
         
         if not homeworks:
             await message.answer("❌ В базе нет домашних заданий для удаления.", 
@@ -60,9 +70,13 @@ async def process_date_selection(message: types.Message, state: FSMContext):
         date_text = message.text.split(" ")[1]  # Получаем "15.12.2024"
         selected_date = datetime.strptime(date_text, "%d.%m.%Y").date()
         
-        # Получаем ДЗ на выбранную дату
+        # Получаем ДЗ на выбранную дату (только своей группы)
         try:
-            homeworks = get_homework_by_date(target_date=selected_date)
+            group_id = await check_active_group(message)
+            if not group_id:
+                await state.finish()
+                return
+            homeworks = get_homework_by_date(group_id=group_id, target_date=selected_date)
             
             if not homeworks:
                 await message.answer("❌ На выбранную дату ДЗ не найдено.")

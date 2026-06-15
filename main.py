@@ -14,7 +14,9 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 from handlers.start import (process_start_command, get_main_keyboard,
-                             process_user_name, process_user_subgroup, check_subgroup)
+                             process_user_name, process_user_subgroup,
+                             process_invite_code_input, process_group_name,
+                             check_active_group)
 from handlers.homework import (show_homework_menu, back_to_main_menu,
                                 show_date_selection, show_today_homework,
                                 show_tomorrow_homework, show_week_homework)
@@ -27,27 +29,20 @@ from handlers.add_homework import (start_add_homework, process_date, process_sub
                                     cancel_add_homework)
 from handlers.delete_homework import (start_delete_homework, process_date_selection,
                                        process_homework_selection, confirm_deletion)
+from handlers.admin_panel import (open_group_admin, open_global_admin,
+                                   group_admin_callback, global_admin_callback)
 from states.homework_states import AddHomework
-from states.user_states import UserRegistration
+from states.user_states import UserRegistration, Onboarding
 from states.delete_states import DeleteHomework
 
 # ── /start ──────────────────────────────────────────────────────
 dp.register_message_handler(process_start_command, commands=['start'])
 
-# ── Регистрация (имя + подгруппа) ───────────────────────────────
-dp.register_message_handler(process_user_name,     state=UserRegistration.waiting_for_name)
-dp.register_message_handler(process_user_subgroup, state=UserRegistration.waiting_for_subgroup)
-
-# ── Если нет подгруппы — перехватываем нажатие кнопки ───────────
-async def handle_subgroup_set(message: types.Message, state: FSMContext):
-    """Обрабатывает выбор подгруппы вне процесса регистрации."""
-    await process_user_subgroup(message, state)
-
-dp.register_message_handler(
-    handle_subgroup_set,
-    lambda m: m.text in ("1 подгруппа", "2 подгруппа"),
-    state="*"
-)
+# ── Регистрация и онбординг (имя -> код/создание группы -> подгруппа) ──
+dp.register_message_handler(process_user_name,        state=UserRegistration.waiting_for_name)
+dp.register_message_handler(process_user_subgroup,    state=UserRegistration.waiting_for_subgroup)
+dp.register_message_handler(process_invite_code_input, state=Onboarding.waiting_for_invite_code)
+dp.register_message_handler(process_group_name,        state=Onboarding.waiting_for_group_name)
 
 # ── Главное меню ─────────────────────────────────────────────────
 dp.register_message_handler(show_homework_menu,   lambda m: m.text == "📚 Посмотреть ДЗ")
@@ -71,6 +66,12 @@ dp.register_message_handler(start_delete_homework,   lambda m: m.text == "❌ У
 dp.register_message_handler(process_date_selection,  state=DeleteHomework.waiting_for_date_selection)
 dp.register_message_handler(process_homework_selection, state=DeleteHomework.waiting_for_homework_selection)
 dp.register_message_handler(confirm_deletion,        state=DeleteHomework.waiting_for_confirmation)
+
+# ── Админки ──────────────────────────────────────────────────────
+dp.register_message_handler(open_group_admin,  commands=['group'], state="*")
+dp.register_message_handler(open_global_admin, commands=['admin'], state="*")
+dp.register_callback_query_handler(group_admin_callback,  lambda c: c.data.startswith('ga_'), state="*")
+dp.register_callback_query_handler(global_admin_callback, lambda c: c.data.startswith('gl_'), state="*")
 
 # ── Календарь ────────────────────────────────────────────────────
 dp.register_callback_query_handler(

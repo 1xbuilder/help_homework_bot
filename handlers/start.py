@@ -220,7 +220,9 @@ async def process_user_name(message: types.Message, state: FSMContext):
     )
     if not user:
         from database import db_operations as _ops
+        import logging
         reason = _ops.LAST_ERROR or "неизвестная причина"
+        logging.warning(f"REGISTER FAIL: user_id={user_id}, причина={reason}")
         await message.answer(
             "❌ Ошибка при регистрации.\n\n"
             f"Причина: {reason}\n\n"
@@ -262,7 +264,24 @@ async def process_invite_code_input(message: types.Message, state: FSMContext):
     if not code:
         await message.answer("Введи код приглашения текстом.")
         return
+    # Команды (/admin, /group, /start и т.п.) не являются кодом приглашения.
+    # Сбрасываем состояние ожидания кода и просим повторить команду —
+    # её подхватит соответствующий обработчик (они с state="*").
+    if code.startswith("/"):
+        await state.finish()
+        await message.answer("Окей, отменил ввод кода. Повтори команду ещё раз.")
+        return
     await handle_invite_code(message, state, code)
+
+
+async def cancel_any_state(message: types.Message, state: FSMContext):
+    """Универсальный выход из любого состояния по /cancel."""
+    await state.finish()
+    user = get_user_by_telegram_id(telegram_id=message.from_user.id)
+    if user and user.active_group_id:
+        await message.answer("Отменено.", reply_markup=get_main_keyboard(message.from_user.id))
+    else:
+        await message.answer("Отменено. Напиши /start, чтобы начать.")
 
 
 # ── Создание группы старостой ──────────────────────────────────────────────────
@@ -270,6 +289,11 @@ async def process_invite_code_input(message: types.Message, state: FSMContext):
 async def process_group_name(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     name = message.text.strip()
+    # Команда вместо названия — выходим из создания группы.
+    if name.startswith("/"):
+        await state.finish()
+        await message.answer("Создание группы отменено. Повтори команду ещё раз.")
+        return
     if len(name) < 2:
         await message.answer("❌ Слишком короткое название. Введи название группы:")
         return

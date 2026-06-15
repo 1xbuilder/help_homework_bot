@@ -111,6 +111,8 @@ def list_institutions():
 # ── Groups ─────────────────────────────────────────────────────────────────────
 
 def create_group(institution_id, name, owner_user_id=None, external_schedule_id=None):
+    global LAST_ERROR
+    LAST_ERROR = None
     try:
         data = {"institution_id": institution_id, "name": name,
                 "owner_user_id": owner_user_id,
@@ -118,6 +120,9 @@ def create_group(institution_id, name, owner_user_id=None, external_schedule_id=
         r = supabase.table("groups").insert(data).execute()
         return GroupDTO(r.data[0]) if r.data else None
     except Exception as e:
+        import logging
+        LAST_ERROR = str(e)
+        logging.warning(f"CREATE_GROUP FAIL: {e}")
         print(f"Ошибка create_group: {e}")
         return None
 

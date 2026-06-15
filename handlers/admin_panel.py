@@ -31,7 +31,9 @@ def _role_label(role: str) -> str:
 
 # ── Вход в админку старосты ────────────────────────────────────────────────────
 
-async def open_group_admin(message: types.Message):
+async def open_group_admin(message: types.Message, state: FSMContext = None):
+    if state is not None:
+        await state.finish()
     user = get_user_by_telegram_id(telegram_id=message.from_user.id)
     if not user or not user.active_group_id:
         await message.answer("⚠️ Сначала войди в группу. Напиши /start")
@@ -142,7 +144,9 @@ async def _show_members(callback_query, group_id, edit=False):
 
 # ── Глобальная админка ─────────────────────────────────────────────────────────
 
-async def open_global_admin(message: types.Message):
+async def open_global_admin(message: types.Message, state: FSMContext = None):
+    if state is not None:
+        await state.finish()
     user = get_user_by_telegram_id(telegram_id=message.from_user.id)
     if not user or user.global_role != "admin":
         await message.answer("🔒 Раздел только для администратора.")

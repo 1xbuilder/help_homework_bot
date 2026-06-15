@@ -52,6 +52,7 @@ dp.register_message_handler(show_homework_menu,   lambda m: m.text == "📚 По
 dp.register_message_handler(start_add_homework,   lambda m: m.text == "➕ Добавить ДЗ")
 dp.register_message_handler(start_delete_homework,lambda m: m.text == "❌ Удалить ДЗ")
 dp.register_message_handler(show_help_menu,        lambda m: m.text == "❓ Помощь")
+dp.register_message_handler(open_group_admin,      lambda m: m.text == "⚙️ Управление группой", state="*")
 
 # ── Помощь ───────────────────────────────────────────────────────
 dp.register_message_handler(how_working_bot,     lambda m: m.text == "ℹ️ Как работает бот?")

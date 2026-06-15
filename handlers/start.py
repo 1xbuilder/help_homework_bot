@@ -19,11 +19,22 @@ temp_users = {}
 # ── Клавиатуры ─────────────────────────────────────────────────────────────────
 
 def get_main_keyboard(user_id: int):
-    """Главное меню. Кнопки добавления/удаления видят все, но внутри стоит
-    проверка прав — обычному участнику бот откажет (Этап 5)."""
+    """Главное меню адаптируется под роль:
+    - все видят «Посмотреть ДЗ» и «Помощь»;
+    - староста/помощник/админ дополнительно видят «Добавить/Удалить ДЗ»;
+    - староста/админ видят «Управление группой»."""
+    from database.db_operations import can_edit_homework, can_manage_group
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add(KeyboardButton("📚 Посмотреть ДЗ"))
-    kb.add(KeyboardButton("➕ Добавить ДЗ"), KeyboardButton("❌ Удалить ДЗ"))
+
+    user = get_user_by_telegram_id(telegram_id=user_id)
+    group_id = user.active_group_id if user else None
+
+    if group_id and can_edit_homework(user_id, group_id):
+        kb.add(KeyboardButton("➕ Добавить ДЗ"), KeyboardButton("❌ Удалить ДЗ"))
+    if group_id and can_manage_group(user_id, group_id):
+        kb.add(KeyboardButton("⚙️ Управление группой"))
+
     kb.add(KeyboardButton("❓ Помощь"))
     return kb
 

@@ -35,7 +35,7 @@ def get_main_keyboard(user_id: int):
     if group_id and can_manage_group(user_id, group_id):
         kb.add(KeyboardButton("⚙️ Управление группой"))
 
-    kb.add(KeyboardButton("❓ Помощь"))
+    kb.add(KeyboardButton("👤 Профиль"), KeyboardButton("❓ Помощь"))
     return kb
 
 
@@ -181,6 +181,15 @@ async def apply_invite(message: types.Message, state: FSMContext, user, invite):
         group = get_group_by_id(invite.group_id)
         if not group:
             await message.answer("❌ Группа из ссылки не найдена. Попроси новую ссылку.")
+            return
+        # Уже состоит в этой группе? Просто делаем её активной.
+        if get_membership(group.id, user_id):
+            set_active_group(user_id, group.id)
+            await message.answer(
+                f"Ты уже в группе «{group.name}». Сделал её активной ✅",
+                reply_markup=get_main_keyboard(user_id),
+            )
+            await state.finish()
             return
         add_member(group.id, user_id, group_role="member")
         set_active_group(user_id, group.id)

@@ -13,3 +13,8 @@ class Onboarding(StatesGroup):
     waiting_for_invite_code = State()
     # Ветка create_group: староста вводит название своей новой группы.
     waiting_for_group_name  = State()
+
+
+class Profile(StatesGroup):
+    """Профиль: смена имени."""
+    waiting_for_new_name = State()

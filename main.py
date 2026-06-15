@@ -31,8 +31,9 @@ from handlers.delete_homework import (start_delete_homework, process_date_select
                                        process_homework_selection, confirm_deletion)
 from handlers.admin_panel import (open_group_admin, open_global_admin,
                                    group_admin_callback, global_admin_callback)
+from handlers.profile import (open_profile, profile_callback, process_new_name)
 from states.homework_states import AddHomework
-from states.user_states import UserRegistration, Onboarding
+from states.user_states import UserRegistration, Onboarding, Profile
 from states.delete_states import DeleteHomework
 
 # ── Команды (всегда первый приоритет, в любом состоянии) ─────────
@@ -40,6 +41,12 @@ dp.register_message_handler(process_start_command, commands=['start'], state="*"
 dp.register_message_handler(open_group_admin,  commands=['group'], state="*")
 dp.register_message_handler(open_global_admin, commands=['admin'], state="*")
 dp.register_message_handler(cancel_any_state,   commands=['cancel'], state="*")
+dp.register_message_handler(open_profile,       commands=['profile'], state="*")
+
+# ── Профиль (имя, группы, выход) ─────────────────────────────────
+dp.register_message_handler(open_profile,     lambda m: m.text == "👤 Профиль", state="*")
+dp.register_message_handler(process_new_name, state=Profile.waiting_for_new_name)
+dp.register_callback_query_handler(profile_callback, lambda c: c.data.startswith('pf_'), state="*")
 
 # ── Регистрация и онбординг (имя -> код/создание группы -> подгруппа) ──
 dp.register_message_handler(process_user_name,        state=UserRegistration.waiting_for_name)

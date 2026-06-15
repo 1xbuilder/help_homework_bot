@@ -514,3 +514,103 @@ def can_manage_group(user_id, group_id):
         return True
     m = get_membership(group_id, user_id)
     return bool(m and m.group_role == "owner")
+
+
+# ── Дополнительные операции (профиль, переключение групп, админка) ──────────────
+
+def update_user_name(telegram_id, first_name):
+    try:
+        r = supabase.table("users").update({"first_name": first_name}).eq("user_id", telegram_id).execute()
+        return UserDTO(r.data[0]) if r.data else None
+    except Exception as e:
+        print(f"Ошибка update_user_name: {e}")
+        return None
+
+
+def list_user_groups_detailed(user_id):
+    """Возвращает список (membership, group) по всем группам пользователя."""
+    out = []
+    for m in list_user_memberships(user_id):
+        g = get_group_by_id(m.group_id)
+        if g:
+            out.append((m, g))
+    return out
+
+
+def leave_group(user_id, group_id):
+    """Покидает группу. Если это была активная — переключает на любую оставшуюся.
+    Возвращает (ok, новая_активная_group_id|None)."""
+    try:
+        remove_member(group_id, user_id)
+        user = get_user_by_telegram_id(telegram_id=user_id)
+        new_active = None
+        if user and user.active_group_id == group_id:
+            remaining = list_user_memberships(user_id)
+            new_active = remaining[0].group_id if remaining else None
+            set_active_group(user_id, new_active)
+        return True, new_active
+    except Exception as e:
+        print(f"Ошибка leave_group: {e}")
+        return False, None
+
+
+def delete_group(group_id):
+    """Удаляет группу (каскадом — её ДЗ, участников, инвайты через FK on delete cascade)."""
+    try:
+        supabase.table("groups").delete().eq("id", group_id).execute()
+        return True
+    except Exception as e:
+        print(f"Ошибка delete_group: {e}")
+        return False
+
+
+def delete_institution(institution_id):
+    """Удаляет заведение (каскадом — его группы)."""
+    try:
+        supabase.table("institutions").delete().eq("id", institution_id).execute()
+        return True
+    except Exception as e:
+        print(f"Ошибка delete_institution: {e}")
+        return False
+
+
+def list_all_groups():
+    try:
+        r = supabase.table("groups").select("*").order("institution_id").execute()
+        return [GroupDTO(x) for x in r.data]
+    except Exception as e:
+        print(f"Ошибка list_all_groups: {e}")
+        return []
+
+
+def search_users(query):
+    """Поиск пользователей по имени или username (для админки)."""
+    try:
+        r = supabase.table("users").select("*").or_(
+            f"first_name.ilike.%{query}%,username.ilike.%{query}%"
+        ).limit(20).execute()
+        return [UserDTO(x) for x in r.data]
+    except Exception as e:
+        print(f"Ошибка search_users: {e}")
+        return []
+
+
+def count_group_members(group_id):
+    try:
+        r = supabase.table("group_members").select("id", count="exact").eq("group_id", group_id).execute()
+        return r.count or 0
+    except Exception as e:
+        print(f"Ошибка count_group_members: {e}")
+        return 0
+
+
+def update_institution(institution_id, **fields):
+    try:
+        clean = {k: v for k, v in fields.items() if v is not None}
+        if not clean:
+            return get_institution_by_id(institution_id)
+        r = supabase.table("institutions").update(clean).eq("id", institution_id).execute()
+        return InstitutionDTO(r.data[0]) if r.data else None
+    except Exception as e:
+        print(f"Ошибка update_institution: {e}")
+        return None

@@ -264,6 +264,13 @@ async def process_invite_code_input(message: types.Message, state: FSMContext):
     if not code:
         await message.answer("Введи код приглашения текстом.")
         return
+    # Команды (/admin, /group, /start и т.п.) не являются кодом приглашения.
+    # Сбрасываем состояние ожидания кода и просим повторить команду —
+    # её подхватит соответствующий обработчик (они с state="*").
+    if code.startswith("/"):
+        await state.finish()
+        await message.answer("Окей, отменил ввод кода. Повтори команду ещё раз.")
+        return
     await handle_invite_code(message, state, code)
 
 

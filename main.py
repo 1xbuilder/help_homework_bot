@@ -35,8 +35,10 @@ from states.homework_states import AddHomework
 from states.user_states import UserRegistration, Onboarding
 from states.delete_states import DeleteHomework
 
-# ── /start ──────────────────────────────────────────────────────
-dp.register_message_handler(process_start_command, commands=['start'])
+# ── Команды (всегда первый приоритет, в любом состоянии) ─────────
+dp.register_message_handler(process_start_command, commands=['start'], state="*")
+dp.register_message_handler(open_group_admin,  commands=['group'], state="*")
+dp.register_message_handler(open_global_admin, commands=['admin'], state="*")
 
 # ── Регистрация и онбординг (имя -> код/создание группы -> подгруппа) ──
 dp.register_message_handler(process_user_name,        state=UserRegistration.waiting_for_name)
@@ -67,9 +69,7 @@ dp.register_message_handler(process_date_selection,  state=DeleteHomework.waitin
 dp.register_message_handler(process_homework_selection, state=DeleteHomework.waiting_for_homework_selection)
 dp.register_message_handler(confirm_deletion,        state=DeleteHomework.waiting_for_confirmation)
 
-# ── Админки ──────────────────────────────────────────────────────
-dp.register_message_handler(open_group_admin,  commands=['group'], state="*")
-dp.register_message_handler(open_global_admin, commands=['admin'], state="*")
+# ── Админки (коллбэки; команды зарегистрированы выше) ────────────
 dp.register_callback_query_handler(group_admin_callback,  lambda c: c.data.startswith('ga_'), state="*")
 dp.register_callback_query_handler(global_admin_callback, lambda c: c.data.startswith('gl_'), state="*")
 

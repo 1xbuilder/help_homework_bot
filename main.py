@@ -32,8 +32,10 @@ from handlers.delete_homework import (start_delete_homework, process_date_select
 from handlers.admin_panel import (open_group_admin, open_global_admin,
                                    group_admin_callback, global_admin_callback,
                                    process_institution_name, process_institution_city,
-                                   process_institution_provider, process_user_search)
+                                   process_institution_provider, process_user_search,
+                                   process_schedule_id)
 from handlers.profile import (open_profile, profile_callback, process_new_name)
+from handlers.schedule_setup import (campus_chosen, group_chosen, manual_or_id_input)
 from states.homework_states import AddHomework
 from states.user_states import UserRegistration, Onboarding, Profile
 from states.admin_states import GlobalAdmin
@@ -56,6 +58,10 @@ dp.register_message_handler(process_user_name,        state=UserRegistration.wai
 dp.register_message_handler(process_user_subgroup,    state=UserRegistration.waiting_for_subgroup)
 dp.register_message_handler(process_invite_code_input, state=Onboarding.waiting_for_invite_code)
 dp.register_message_handler(process_group_name,        state=Onboarding.waiting_for_group_name)
+# Привязка расписания при создании группы (корпус → группа кнопками / ручной ввод)
+dp.register_callback_query_handler(campus_chosen, lambda c: c.data.startswith('sb_campus_'), state=Onboarding.waiting_for_campus)
+dp.register_callback_query_handler(group_chosen,  lambda c: c.data.startswith('sb_group'), state=Onboarding.waiting_for_sched_group)
+dp.register_message_handler(manual_or_id_input,   state=Onboarding.waiting_for_sched_group)
 
 # ── Главное меню ─────────────────────────────────────────────────
 dp.register_message_handler(show_homework_menu,   lambda m: m.text == "📚 Посмотреть ДЗ")
@@ -88,6 +94,7 @@ dp.register_message_handler(process_institution_name,     state=GlobalAdmin.wait
 dp.register_message_handler(process_institution_city,     state=GlobalAdmin.waiting_for_institution_city)
 dp.register_message_handler(process_institution_provider, state=GlobalAdmin.waiting_for_institution_provider)
 dp.register_message_handler(process_user_search,          state=GlobalAdmin.waiting_for_user_search)
+dp.register_message_handler(process_schedule_id,          state=GlobalAdmin.waiting_for_schedule_id)
 
 # ── Календарь ────────────────────────────────────────────────────
 dp.register_callback_query_handler(

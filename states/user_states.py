@@ -13,6 +13,9 @@ class Onboarding(StatesGroup):
     waiting_for_invite_code = State()
     # Ветка create_group: староста вводит название своей новой группы.
     waiting_for_group_name  = State()
+    # Привязка расписания при создании группы (провайдер с picker):
+    waiting_for_campus      = State()  # выбор корпуса кнопками
+    waiting_for_sched_group = State()  # выбор группы из списка / ручной ввод
 
 
 class Profile(StatesGroup):

@@ -36,6 +36,10 @@ def get_main_keyboard(user_id: int):
         kb.add(KeyboardButton("⚙️ Управление группой"))
 
     kb.add(KeyboardButton("👤 Профиль"), KeyboardButton("❓ Помощь"))
+
+    # Кнопка глобальной админки — только для админов (чтобы не печатать /admin).
+    if user and user.global_role == "admin":
+        kb.add(KeyboardButton("🛠 Админка"))
     return kb
 
 

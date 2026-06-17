@@ -6,8 +6,7 @@
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from states.user_states import Onboarding, UserRegistration
-from handlers.start import subgroup_keyboard
+from states.user_states import Onboarding
 from database.db_operations import (
     get_group_by_id, get_institution_by_id, update_group,
 )
@@ -122,12 +121,41 @@ async def group_chosen(callback_query: types.CallbackQuery, state: FSMContext):
     gid = st.get("sched_group_db_id")
     update_group(gid, external_schedule_id=external_id)
     await callback_query.answer(f"Группа {name} привязана")
-    g = get_group_by_id(gid)
+    # Убираем большое сообщение со списком групп — оно больше не нужно.
+    try:
+        await callback_query.message.delete()
+    except Exception:
+        pass
+    await _ask_subgroup_inline(callback_query.message,
+                              f"Расписание привязано: {name}.")
+
+
+async def _ask_subgroup_inline(message, prefix=""):
+    """Спрашивает подгруппу inline-кнопками (единый стиль с выбором группы)."""
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(InlineKeyboardButton("1 подгруппа", callback_data="sb_sub_1"),
+           InlineKeyboardButton("2 подгруппа", callback_data="sb_sub_2"))
+    text = (f"{prefix}\n\nУкажи свою подгруппу:" if prefix else "Укажи свою подгруппу:")
+    await message.answer(text, reply_markup=kb)
+    await Onboarding.waiting_for_sched_group.set()  # держим в потоке, подгруппу ловит callback
+
+
+async def subgroup_chosen(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработка inline-выбора подгруппы в потоке создания группы."""
+    from database.db_operations import update_user_subgroup
+    from handlers.start import get_main_keyboard
+    sg = callback_query.data.replace("sb_sub_", "")
+    update_user_subgroup(telegram_id=callback_query.from_user.id, subgroup=sg)
+    await state.finish()
+    try:
+        await callback_query.message.delete()
+    except Exception:
+        pass
+    await callback_query.answer(f"Подгруппа {sg} сохранена")
     await callback_query.message.answer(
-        f"Расписание привязано: {name}.\n\nТеперь укажи свою подгруппу:",
-        reply_markup=subgroup_keyboard(),
+        f"Готово. Подгруппа {sg} сохранена. Группа настроена.",
+        reply_markup=get_main_keyboard(callback_query.from_user.id),
     )
-    await UserRegistration.waiting_for_subgroup.set()
 
 
 async def manual_or_id_input(message: types.Message, state: FSMContext):
@@ -156,14 +184,7 @@ async def manual_or_id_input(message: types.Message, state: FSMContext):
 
 
 async def _go_to_subgroup(message, state, created, group_name=None):
-    await state.finish()
     if created and group_name:
-        await message.answer(
-            f"Группа «{group_name}» создана, ты её староста.\n\n"
-            "Укажи свою подгруппу:",
-            reply_markup=subgroup_keyboard(),
-        )
+        await _ask_subgroup_inline(message, f"Группа «{group_name}» создана, ты её староста.")
     else:
-        await message.answer("Готово. Укажи свою подгруппу:",
-                             reply_markup=subgroup_keyboard())
-    await UserRegistration.waiting_for_subgroup.set()
+        await _ask_subgroup_inline(message, "")

@@ -35,7 +35,8 @@ from handlers.admin_panel import (open_group_admin, open_global_admin,
                                    process_institution_provider, process_user_search,
                                    process_schedule_id)
 from handlers.profile import (open_profile, profile_callback, process_new_name)
-from handlers.schedule_setup import (campus_chosen, group_chosen, manual_or_id_input)
+from handlers.schedule_setup import (campus_chosen, group_chosen, manual_or_id_input,
+                                      subgroup_chosen)
 from states.homework_states import AddHomework
 from states.user_states import UserRegistration, Onboarding, Profile
 from states.admin_states import GlobalAdmin
@@ -45,6 +46,7 @@ from states.delete_states import DeleteHomework
 dp.register_message_handler(process_start_command, commands=['start'], state="*")
 dp.register_message_handler(open_group_admin,  commands=['group'], state="*")
 dp.register_message_handler(open_global_admin, commands=['admin'], state="*")
+dp.register_message_handler(open_global_admin, lambda m: m.text == "🛠 Админка", state="*")
 dp.register_message_handler(cancel_any_state,   commands=['cancel'], state="*")
 dp.register_message_handler(open_profile,       commands=['profile'], state="*")
 
@@ -61,6 +63,7 @@ dp.register_message_handler(process_group_name,        state=Onboarding.waiting_
 # Привязка расписания при создании группы (корпус → группа кнопками / ручной ввод)
 dp.register_callback_query_handler(campus_chosen, lambda c: c.data.startswith('sb_campus_'), state=Onboarding.waiting_for_campus)
 dp.register_callback_query_handler(group_chosen,  lambda c: c.data.startswith('sb_group'), state=Onboarding.waiting_for_sched_group)
+dp.register_callback_query_handler(subgroup_chosen, lambda c: c.data.startswith('sb_sub_'), state=Onboarding.waiting_for_sched_group)
 dp.register_message_handler(manual_or_id_input,   state=Onboarding.waiting_for_sched_group)
 
 # ── Главное меню ─────────────────────────────────────────────────
@@ -125,8 +128,13 @@ dp.register_message_handler(confirm_add_homework, state=AddHomework.waiting_for_
 dp.register_message_handler(back_to_main_menu, lambda m: m.text in ("🔙 Назад", "Назад"))
 
 async def on_startup(dp):
-    from photo_proxy import start_proxy
-    await start_proxy()
+    # HTTP-сервер (фото + расписание для веб-аппа). Если не поднимется —
+    # бот продолжит работать через polling, контейнер не уйдёт в цикл рестартов.
+    try:
+        from photo_proxy import start_proxy
+        await start_proxy()
+    except Exception as e:
+        logging.exception(f"HTTP-сервер не запустился (бот продолжит работать): {e}")
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

@@ -104,6 +104,17 @@ def create_proxy_app():
     app.router.add_get("/api/schedule", handle_schedule)
     app.router.add_options("/api/schedule", handle_schedule)
     app.router.add_get("/health", handle_healthcheck)
+
+    # Роуты веб-админки (/api/admin/*). Если модуль не подгрузился — бот и прокси
+    # продолжают работать, просто без админки (чтобы не уронить контейнер).
+    try:
+        from admin_api import register_admin_routes
+        register_admin_routes(app)
+        print("🛠  Admin API routes registered", flush=True)
+    except Exception as e:
+        import logging
+        logging.exception(f"Admin API не подключился (бот продолжит работать): {e}")
+
     return app
 
 async def start_proxy():

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>StudyFlow · Админ</title>
+<style>
+:root{
+  --bg:#EEF1F6;--panel:#FFFFFF;--panel2:#F6F8FB;--line:#E2E8F0;--line2:#CBD5E1;
+  --accent:#2A5CAA;--accent-dark:#1E4480;--orange:#FF7A42;--green:#16A34A;
+  --red:#DC2626;--amber:#D97706;--text:#1E293B;--dim:#64748B;--muted:#94A3B8;
+  --r:10px;--r-sm:7px;--shadow:0 1px 2px rgba(16,33,64,.06),0 4px 16px rgba(16,33,64,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+a{color:var(--accent)}
+.mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+
+/* ── LOGIN ── */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--line);
+  border-radius:16px;padding:32px 28px;box-shadow:var(--shadow)}
+.login-brand{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.login-brand .wm{font-weight:800;font-size:20px;letter-spacing:-.3px}
+.login-brand .wm b{color:var(--orange);font-weight:800}
+.login-brand .tag{margin-left:auto;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin-bottom:6px}
+.field input{width:100%;padding:11px 13px;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:var(--r-sm);transition:border-color .15s,background .15s}
+.field input:focus{outline:none;border-color:var(--accent);background:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 16px;
+  border-radius:var(--r-sm);font-weight:600;font-size:13px;transition:all .14s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff;width:100%;padding:12px}
+.btn-primary:hover{background:var(--accent-dark)}
+.btn-primary:disabled{opacity:.55;cursor:default}
+.login-err{background:#FEF2F2;border:1px solid #FECACA;color:var(--red);padding:9px 12px;
+  border-radius:var(--r-sm);font-size:12.5px;margin-bottom:14px;display:none}
+.login-err.show{display:block}
+
+/* ── SHELL ── */
+.shell{display:none;grid-template-columns:230px 1fr;min-height:100vh}
+.shell.show{display:grid}
+.side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.side-brand{padding:20px 20px 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--line)}
+.side-brand .wm{font-weight:800;font-size:17px;letter-spacing:-.3px}
+.side-brand .wm b{color:var(--orange)}
+.nav{padding:12px 10px;flex:1;display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--r-sm);
+  color:var(--dim);font-weight:600;font-size:13px;text-align:left;width:100%;transition:all .13s}
+.nav-item:hover{background:var(--panel2);color:var(--text)}
+.nav-item.active{background:var(--accent);color:#fff}
+.nav-item .ico{width:18px;text-align:center;font-size:15px;opacity:.9}
+.nav-item .ct{margin-left:auto;font-size:11px;font-weight:700;background:rgba(0,0,0,.06);
+  padding:1px 7px;border-radius:20px;color:inherit}
+.nav-item.active .ct{background:rgba(255,255,255,.22)}
+.side-foot{padding:14px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.side-foot .who{font-size:12px;color:var(--dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-foot .out{font-size:12px;color:var(--red);font-weight:600}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{padding:22px 28px 0;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.topbar h1{font-size:22px;font-weight:800;letter-spacing:-.4px}
+.topbar .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.topbar .actions{margin-left:auto;display:flex;gap:8px}
+.btn-ghost{border:1px solid var(--line2);background:var(--panel);color:var(--dim);font-weight:600}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--accent-dark)}
+.content{padding:18px 28px 40px;flex:1}
+
+/* ── SEARCH ── */
+.searchbar{display:flex;gap:10px;margin-bottom:16px;align-items:center}
+.search-input{flex:1;max-width:420px;position:relative}
+.search-input input{width:100%;padding:10px 13px 10px 36px;background:var(--panel);
+  border:1px solid var(--line2);border-radius:var(--r);transition:border-color .15s}
+.search-input input:focus{outline:none;border-color:var(--accent)}
+.search-input::before{content:'⌕';position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  color:var(--muted);font-size:17px}
+.filter-pills{display:flex;gap:6px}
+.pill{padding:7px 13px;border-radius:20px;font-size:12.5px;font-weight:600;color:var(--dim);
+  background:var(--panel);border:1px solid var(--line2);transition:all .13s}
+.pill:hover{border-color:var(--accent)}
+.pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ── TABLE / CARDS ── */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;padding:11px 16px;font-size:11px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.6px;background:var(--panel2);border-bottom:1px solid var(--line);white-space:nowrap}
+tbody td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:var(--panel2)}
+.cell-name{font-weight:600}
+.cell-sub{font-size:12px;color:var(--muted)}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
+  font-size:11.5px;font-weight:700;letter-spacing:.2px}
+.tag-admin{background:#FEF3C7;color:#92400E}
+.tag-moder{background:#DBEAFE;color:#1E40AF}
+.tag-user{background:#F1F5F9;color:#64748B}
+.tag-owner{background:#FEE2E2;color:#991B1B}
+.tag-helper{background:#E0E7FF;color:#3730A3}
+.tag-member{background:#F1F5F9;color:#64748B}
+.tag-on{background:#DCFCE7;color:#166534}
+.tag-off{background:#F1F5F9;color:#94A3B8}
+.row-actions{display:flex;gap:6px;justify-content:flex-end}
+.icon-act{width:30px;height:30px;border-radius:var(--r-sm);display:flex;align-items:center;
+  justify-content:center;color:var(--dim);border:1px solid transparent;transition:all .12s;font-size:14px}
+.icon-act:hover{background:var(--panel2);border-color:var(--line2);color:var(--accent)}
+.icon-act.danger:hover{color:var(--red);border-color:#FECACA;background:#FEF2F2}
+.empty{padding:54px 24px;text-align:center;color:var(--muted)}
+.empty .ico{font-size:40px;margin-bottom:10px;opacity:.5}
+.loading{padding:48px;text-align:center;color:var(--muted)}
+.spin{display:inline-block;width:18px;height:18px;border:2.5px solid var(--line2);
+  border-top-color:var(--accent);border-radius:50%;animation:sp .65s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ── DRAWER (edit) ── */
+.scrim{position:fixed;inset:0;background:rgba(15,23,42,.4);backdrop-filter:blur(2px);
+  opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+.scrim.show{opacity:1;pointer-events:all}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:420px;max-width:92vw;background:var(--panel);
+  border-left:1px solid var(--line);box-shadow:-12px 0 40px rgba(15,23,42,.12);
+  transform:translateX(100%);transition:transform .24s cubic-bezier(.4,0,.2,1);z-index:51;
+  display:flex;flex-direction:column}
+.drawer.show{transform:translateX(0)}
+.drawer-head{padding:20px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.drawer-head h3{font-size:16px;font-weight:700;flex:1}
+.drawer-head .x{width:32px;height:32px;border-radius:var(--r-sm);color:var(--dim);font-size:18px;
+  display:flex;align-items:center;justify-content:center}
+.drawer-head .x:hover{background:var(--panel2)}
+.drawer-body{padding:20px 22px;overflow-y:auto;flex:1}
+.drawer-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px}
+.drawer-foot .btn{flex:1}
+.btn-danger{background:#FEF2F2;color:var(--red);border:1px solid #FECACA}
+.btn-danger:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin-bottom:6px}
+.fg input,.fg select,.fg textarea{width:100%;padding:10px 12px;background:var(--panel2);
+  border:1px solid var(--line2);border-radius:var(--r-sm);transition:border-color .15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--accent);background:#fff}
+.fg textarea{resize:vertical;min-height:80px}
+.fg .hint{font-size:11.5px;color:var(--muted);margin-top:5px}
+.seg{display:flex;gap:0;border:1px solid var(--line2);border-radius:var(--r-sm);overflow:hidden}
+.seg button{flex:1;padding:9px;font-weight:600;font-size:12.5px;color:var(--dim);background:var(--panel2);transition:all .12s}
+.seg button.active{background:var(--accent);color:#fff}
+.subtable{margin-top:6px;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
+.subrow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:13px}
+.subrow:last-child{border-bottom:none}
+.subrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.subrow select{padding:5px 8px;border:1px solid var(--line2);border-radius:6px;background:#fff;font-size:12px}
+.subrow .rm{color:var(--red);font-size:16px;width:24px;text-align:center}
+.section-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.6px;margin:22px 0 10px}
+
+/* ── TOAST ── */
+.toasts{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{background:#1E293B;color:#fff;padding:11px 18px;border-radius:var(--r);font-size:13px;font-weight:500;
+  box-shadow:0 8px 24px rgba(15,23,42,.25);animation:tin .2s ease;max-width:90vw}
+.toast.err{background:var(--red)}
+.toast.ok{background:var(--green)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* copyable invite link */
+.linkbox{display:flex;gap:8px;align-items:center;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:var(--r-sm);padding:9px 12px;margin-top:8px}
+.linkbox .lk{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+.linkbox button{font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap}
+
+@media(max-width:720px){
+  .shell.show{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;z-index:40;transform:translateX(-100%);transition:transform .2s;width:230px}
+  .side.open{transform:translateX(0)}
+  .content{padding:16px}
+  .topbar{padding:16px 16px 0}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <span class="wm">Study<b>Flow</b></span>
+      <span class="tag">Admin</span>
+    </div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="field">
+      <label>Логин</label>
+      <input id="inLogin" type="text" autocomplete="username" placeholder="admin">
+    </div>
+    <div class="field">
+      <label>Пароль</label>
+      <input id="inPass" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <button class="btn btn-primary" id="btnLogin">Войти</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="shell" id="shell">
+  <aside class="side" id="side">
+    <div class="side-brand"><span class="wm">Study<b>Flow</b></span></div>
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-tab="users"><span class="ico">👤</span>Пользователи<span class="ct" id="ctUsers">·</span></button>
+      <button class="nav-item" data-tab="groups"><span class="ico">👥</span>Группы<span class="ct" id="ctGroups">·</span></button>
+      <button class="nav-item" data-tab="institutions"><span class="ico">🏛</span>Заведения<span class="ct" id="ctInst">·</span></button>
+      <button class="nav-item" data-tab="homeworks"><span class="ico">📝</span>Задания<span class="ct" id="ctHw">·</span></button>
+    </nav>
+    <div class="side-foot">
+      <span class="who" id="whoami">—</span>
+      <button class="out" id="btnLogout">Выйти</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Пользователи</h1>
+        <div class="sub" id="pageSub">Все, кто писал боту</div>
+      </div>
+      <div class="actions" id="pageActions"></div>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<!-- DRAWER -->
+<div class="scrim" id="scrim"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head"><h3 id="drawerTitle">Редактирование</h3><button class="x" id="drawerClose">✕</button></div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot" id="drawerFoot"></div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+//  Конфиг. API_BASE — публичный URL твоего бота на bothost + /api/admin
+//  Пример: 'https://xxxx.bothost.ru/api/admin'  (тот же домен, что SCHEDULE_API)
+// ════════════════════════════════════════════════════════════════════
+const API_BASE = localStorage.getItem('sf_api_base') || 'ВСТАВЬ_URL_БОТА/api/admin';
+
+const T = { token: localStorage.getItem('sf_token') || null, login: localStorage.getItem('sf_login') || '' };
+const state = { tab:'users', q:'', filter:'all', cache:{}, insts:[], groups:[] };
+
+// ── HTTP ──
+async function api(path, {method='GET', body=null}={}){
+  const headers = {'Content-Type':'application/json'};
+  if(T.token) headers['Authorization'] = 'Bearer '+T.token;
+  const res = await fetch(API_BASE+path, {method, headers, body: body?JSON.stringify(body):null});
+  if(res.status===401){ doLogout(); throw new Error('Сессия истекла, войди заново'); }
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('Ошибка '+res.status));
+  return data;
+}
+
+// ── Toast ──
+function toast(msg, kind=''){
+  const el=document.createElement('div'); el.className='toast '+kind; el.textContent=msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300)}, 2600);
+}
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// ════════════════════════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════════════════════════
+async function doLogin(){
+  const login=document.getElementById('inLogin').value.trim();
+  const password=document.getElementById('inPass').value;
+  const errEl=document.getElementById('loginErr');
+  const btn=document.getElementById('btnLogin');
+  errEl.classList.remove('show');
+  btn.disabled=true; btn.textContent='Вход…';
+  try{
+    if(API_BASE.startsWith('ВСТАВЬ')) throw new Error('API_BASE не настроен в admin.html');
+    const r=await api('/login',{method:'POST',body:{login,password}});
+    T.token=r.token; T.login=r.login;
+    localStorage.setItem('sf_token',r.token); localStorage.setItem('sf_login',r.login);
+    enterApp();
+  }catch(e){
+    errEl.textContent=e.message; errEl.classList.add('show');
+  }finally{
+    btn.disabled=false; btn.textContent='Войти';
+  }
+}
+function doLogout(){
+  T.token=null; localStorage.removeItem('sf_token');
+  document.getElementById('shell').classList.remove('show');
+  document.getElementById('loginScreen').style.display='flex';
+}
+function enterApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('shell').classList.add('show');
+  document.getElementById('whoami').textContent='👤 '+(T.login||'admin');
+  loadCounts();
+  switchTab('users');
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  NAV
+// ════════════════════════════════════════════════════════════════════
+const TABS={
+  users:{title:'Пользователи',sub:'Все, кто писал боту'},
+  groups:{title:'Группы',sub:'Учебные группы и их состав'},
+  institutions:{title:'Заведения',sub:'Вузы и колледжи'},
+  homeworks:{title:'Задания',sub:'Домашние задания по группам'},
+};
+function switchTab(tab){
+  state.tab=tab; state.q=''; state.filter='all';
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.getElementById('pageTitle').textContent=TABS[tab].title;
+  document.getElementById('pageSub').textContent=TABS[tab].sub;
+  renderActions();
+  render();
+}
+function renderActions(){
+  const el=document.getElementById('pageActions'); el.innerHTML='';
+  if(state.tab==='institutions'){
+    el.innerHTML=`<button class="btn btn-accent" onclick="openInstCreate()">+ Заведение</button>`;
+  } else if(state.tab==='groups'){
+    el.innerHTML=`<button class="btn btn-accent" onclick="openGroupCreate()">+ Группа</button>
+      <button class="btn btn-ghost" onclick="openCreateLink()">🎓 Ссылка старосте</button>`;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  RENDER ROUTER
+// ════════════════════════════════════════════════════════════════════
+async function render(){
+  const c=document.getElementById('content');
+  c.innerHTML=`<div class="loading"><span class="spin"></span>Загрузка…</div>`;
+  try{
+    if(state.tab==='users') await renderUsers();
+    else if(state.tab==='groups') await renderGroups();
+    else if(state.tab==='institutions') await renderInstitutions();
+    else if(state.tab==='homeworks') await renderHomeworks();
+  }catch(e){ c.innerHTML=`<div class="empty"><div class="ico">⚠️</div>${esc(e.message)}</div>`; }
+}
+
+function searchbarHTML(placeholder, pills){
+  let p='';
+  if(pills) p=`<div class="filter-pills">${pills.map(x=>`<button class="pill ${state.filter===x.v?'active':''}" onclick="setFilter('${x.v}')">${x.t}</button>`).join('')}</div>`;
+  return `<div class="searchbar">
+    <div class="search-input"><input id="searchBox" placeholder="${placeholder}" value="${esc(state.q)}"></div>${p}
+  </div>`;
+}
+function setFilter(v){ state.filter=v; render(); }
+function bindSearch(fn){
+  const box=document.getElementById('searchBox'); if(!box)return;
+  box.oninput=e=>{ state.q=e.target.value; clearTimeout(box._t); box._t=setTimeout(fn,250); };
+  box.focus(); box.setSelectionRange(box.value.length,box.value.length);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  USERS
+// ════════════════════════════════════════════════════════════════════
+async function renderUsers(){
+  const data=await api('/users'+(state.q?('?q='+encodeURIComponent(state.q)):''));
+  let users=data.users;
+  if(state.filter!=='all') users=users.filter(u=>u.global_role===state.filter);
+  const pills=[{v:'all',t:'Все'},{v:'admin',t:'Админы'},{v:'moderator',t:'Модераторы'},{v:'user',t:'Юзеры'}];
+  const rows = users.map(u=>`
+    <tr>
+      <td><div class="cell-name">${esc(u.first_name)||'—'}${u.last_name?' '+esc(u.last_name):''}</div>
+          <div class="cell-sub">${u.username?'@'+esc(u.username):'без username'}</div></td>
+      <td class="mono">${u.user_id}</td>
+      <td>${roleTag(u.global_role)}</td>
+      <td>${u.subgroup?('пг '+esc(u.subgroup)):'—'}</td>
+      <td><div class="row-actions">
+        <button class="icon-act" title="Изменить" onclick="openUserEdit(${u.user_id})">✎</button>
+        <button class="icon-act danger" title="Удалить" onclick="delUser(${u.user_id},'${esc(u.first_name)}')">🗑</button>
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('content').innerHTML = searchbarHTML('Поиск по имени или username…',pills)
+    + (users.length?`<div class="card"><table>
+        <thead><tr><th>Имя</th><th>Telegram ID</th><th>Роль</th><th>Подгр.</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`
+       :`<div class="card"><div class="empty"><div class="ico">🔍</div>Никого не нашлось</div></div>`);
+  bindSearch(renderUsers);
+}
+function roleTag(r){
+  const m={admin:['tag-admin','Админ'],moderator:['tag-moder','Модератор'],user:['tag-user','Пользователь']};
+  const [cls,lbl]=m[r]||m.user; return `<span class="tag ${cls}">${lbl}</span>`;
+}
+async function openUserEdit(uid){
+  const u=await api('/users/'+uid);
+  drawer('Пользователь', `
+    <div class="fg"><label>Имя</label><input id="f_first" value="${esc(u.first_name)}"></div>
+    <div class="fg"><label>Фамилия</label><input id="f_last" value="${esc(u.last_name||'')}"></div>
+    <div class="fg"><label>Username (без @)</label><input id="f_uname" value="${esc(u.username||'')}">
+      <div class="hint">Системный ник. Меняется только здесь, в Telegram остаётся прежним.</div></div>
+    <div class="fg"><label>Глобальная роль</label>
+      <div class="seg" id="seg_role">
+        ${['user','moderator','admin'].map(r=>`<button data-v="${r}" class="${u.global_role===r?'active':''}" onclick="segPick('seg_role',this)">${({user:'Юзер',moderator:'Модер',admin:'Админ'})[r]}</button>`).join('')}
+      </div></div>
+    <div class="fg"><label>Подгруппа</label>
+      <div class="seg" id="seg_sg">
+        ${['','1','2'].map(s=>`<button data-v="${s}" class="${(u.subgroup||'')===s?'active':''}" onclick="segPick('seg_sg',this)">${s||'—'}</button>`).join('')}
+      </div></div>
+    ${u.groups&&u.groups.length?`<div class="section-label">Группы</div>
+      <div class="subtable">${u.groups.map(g=>`<div class="subrow">
+        <span class="nm">${esc(g.group_name)} ${g.is_active?'· активна':''}</span>
+        <span class="tag tag-${g.group_role}">${({owner:'Староста',helper:'Помощник',member:'Участник'})[g.group_role]}</span>
+      </div>`).join('')}</div>`:''}
+  `, [
+    {label:'Сохранить', cls:'btn-accent', fn:async()=>{
+      await api('/users/'+uid,{method:'PATCH',body:{
+        first_name:val('f_first'), last_name:val('f_last'), username:val('f_uname'),
+        global_role:segVal('seg_role'), subgroup:segVal('seg_sg')
+      }});
+      toast('Сохранено','ok'); closeDrawer(); renderUsers(); loadCounts();
+    }},
+    {label:'Удалить', cls:'btn-danger', fn:()=>delUser(uid,u.first_name,true)}
+  ]);
+}
+async function delUser(uid,name,fromDrawer){
+  if(!confirm(`Удалить пользователя «${name}»? Он исчезнет из всех групп.`)) return;
+  await api('/users/'+uid,{method:'DELETE'});
+  toast('Пользователь удалён'); if(fromDrawer)closeDrawer(); renderUsers(); loadCounts();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  GROUPS
+// ════════════════════════════════════════════════════════════════════
+async function renderGroups(){
+  await ensureInsts();
+  const data=await api('/groups'); state.groups=data.groups;
+  let groups=data.groups;
+  if(state.q){ const q=state.q.toLowerCase(); groups=groups.filter(g=>g.name.toLowerCase().includes(q)); }
+  const instName=id=>{ const i=state.insts.find(x=>x.id===id); return i?i.name:'—'; };
+  const rows=groups.map(g=>`
+    <tr>
+      <td><div class="cell-name">${esc(g.name)}</div><div class="cell-sub">${esc(instName(g.institution_id))}</div></td>
+      <td>${g.members_count} чел.</td>
+      <td class="mono">${g.external_schedule_id?esc(g.external_schedule_id):'<span style="color:var(--muted)">не задан</span>'}</td>
+      <td><div class="row-actions">
+        <button class="icon-act" title="Открыть" onclick="openGroupEdit(${g.id})">✎</button>
+        <button class="icon-act danger" title="Удалить" onclick="delGroup(${g.id},'${esc(g.name)}')">🗑</button>
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('content').innerHTML = searchbarHTML('Поиск группы…')
+    + (groups.length?`<div class="card"><table>
+        <thead><tr><th>Группа</th><th>Состав</th><th>ID расписания</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`
+       :`<div class="card"><div class="empty"><div class="ico">👥</div>Групп нет</div></div>`);
+  bindSearch(renderGroups);
+}
+async function openGroupEdit(gid){
+  const g=await api('/groups/'+gid);
+  await ensureInsts();
+  drawer('Группа «'+esc(g.name)+'»',`
+    <div class="fg"><label>Название</label><input id="g_name" value="${esc(g.name)}"></div>
+    <div class="fg"><label>Заведение</label><select id="g_inst">
+      ${state.insts.map(i=>`<option value="${i.id}" ${i.id===g.institution_id?'selected':''}>${esc(i.name)}</option>`).join('')}
+    </select></div>
+    <div class="fg"><label>ID расписания</label><input id="g_sched" value="${esc(g.external_schedule_id||'')}">
+      <div class="hint">ОмГТУ — число (напр. 427). Авиаколледж — путь вида ul_lenina_24/КС115.</div></div>
+    <div class="section-label">Участники (${g.members.length})</div>
+    <div class="subtable" id="memList">
+      ${g.members.length?g.members.map(m=>memberRow(gid,m)).join(''):'<div class="subrow"><span class="nm" style="color:var(--muted)">Пусто</span></div>'}
+    </div>
+  `,[
+    {label:'Сохранить', cls:'btn-accent', fn:async()=>{
+      await api('/groups/'+gid,{method:'PATCH',body:{name:val('g_name'),institution_id:val('g_inst'),external_schedule_id:val('g_sched')}});
+      toast('Сохранено','ok'); closeDrawer(); renderGroups();
+    }},
+    {label:'Удалить', cls:'btn-danger', fn:()=>delGroup(gid,g.name,true)}
+  ]);
+}
+function memberRow(gid,m){
+  const nm=(m.first_name||('id '+m.user_id))+(m.username?' · @'+m.username:'');
+  return `<div class="subrow">
+    <span class="nm">${esc(nm)}</span>
+    <select onchange="setMemberRole(${gid},${m.user_id},this.value)">
+      ${['owner','helper','member'].map(r=>`<option value="${r}" ${m.group_role===r?'selected':''}>${({owner:'Староста',helper:'Помощник',member:'Участник'})[r]}</option>`).join('')}
+    </select>
+    <button class="rm" title="Убрать из группы" onclick="kickMember(${gid},${m.user_id})">×</button>
+  </div>`;
+}
+async function setMemberRole(gid,uid,role){
+  await api(`/groups/${gid}/members/${uid}`,{method:'PATCH',body:{group_role:role}});
+  toast('Роль изменена','ok');
+}
+async function kickMember(gid,uid){
+  if(!confirm('Убрать участника из группы?'))return;
+  await api(`/groups/${gid}/members/${uid}`,{method:'DELETE'});
+  toast('Убран из группы'); openGroupEdit(gid);
+}
+async function delGroup(gid,name,fromDrawer){
+  if(!confirm(`Удалить группу «${name}»? Удалятся её ДЗ и участники.`))return;
+  await api('/groups/'+gid,{method:'DELETE'});
+  toast('Группа удалена'); if(fromDrawer)closeDrawer(); renderGroups(); loadCounts();
+}
+async function openGroupCreate(){
+  await ensureInsts();
+  if(!state.insts.length){ toast('Сначала создай заведение','err'); return; }
+  drawer('Новая группа',`
+    <div class="fg"><label>Название</label><input id="ng_name" placeholder="ИС-301"></div>
+    <div class="fg"><label>Заведение</label><select id="ng_inst">
+      ${state.insts.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select></div>
+    <div class="fg"><label>ID расписания (необязательно)</label><input id="ng_sched" placeholder="напр. 427"></div>
+  `,[{label:'Создать', cls:'btn-accent', fn:async()=>{
+    if(val('ng_name').length<2){toast('Введи название','err');return;}
+    await api('/groups',{method:'POST',body:{name:val('ng_name'),institution_id:val('ng_inst'),external_schedule_id:val('ng_sched')||null}});
+    toast('Группа создана','ok'); closeDrawer(); renderGroups(); loadCounts();
+  }}]);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  INSTITUTIONS
+// ════════════════════════════════════════════════════════════════════
+async function renderInstitutions(){
+  const data=await api('/institutions'); state.insts=data.institutions;
+  let insts=data.institutions;
+  if(state.q){ const q=state.q.toLowerCase(); insts=insts.filter(i=>i.name.toLowerCase().includes(q)); }
+  const rows=insts.map(i=>`
+    <tr>
+      <td><div class="cell-name">${esc(i.name)}</div><div class="cell-sub">${esc(i.city||'город не указан')}</div></td>
+      <td>${i.schedule_provider?`<span class="tag tag-moder">${esc(i.schedule_provider)}</span>`:'<span style="color:var(--muted)">без расписания</span>'}</td>
+      <td>${i.groups_count} групп</td>
+      <td><div class="row-actions">
+        <button class="icon-act" title="Изменить" onclick="openInstEdit(${i.id})">✎</button>
+        <button class="icon-act danger" title="Удалить" onclick="delInst(${i.id},'${esc(i.name)}')">🗑</button>
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('content').innerHTML = searchbarHTML('Поиск заведения…')
+    + (insts.length?`<div class="card"><table>
+        <thead><tr><th>Заведение</th><th>Расписание</th><th>Группы</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`
+       :`<div class="card"><div class="empty"><div class="ico">🏛</div>Заведений нет</div></div>`);
+  bindSearch(renderInstitutions);
+}
+function instForm(i){
+  return `
+  <div class="fg"><label>Название</label><input id="i_name" value="${esc(i?.name||'')}" placeholder="ОмГТУ"></div>
+  <div class="fg"><label>Город</label><input id="i_city" value="${esc(i?.city||'')}" placeholder="Омск"></div>
+  <div class="fg"><label>Провайдер расписания</label><select id="i_prov">
+    <option value="" ${!i?.schedule_provider?'selected':''}>Без расписания</option>
+    <option value="omgtu" ${i?.schedule_provider==='omgtu'?'selected':''}>ОмГТУ (omgtu)</option>
+    <option value="oat" ${i?.schedule_provider==='oat'?'selected':''}>Авиаколледж (oat)</option>
+  </select><div class="hint">Определяет, откуда тянуть расписание для групп заведения.</div></div>`;
+}
+async function openInstCreate(){
+  drawer('Новое заведение', instForm(null),[{label:'Создать',cls:'btn-accent',fn:async()=>{
+    if(val('i_name').length<2){toast('Введи название','err');return;}
+    await api('/institutions',{method:'POST',body:{name:val('i_name'),city:val('i_city'),schedule_provider:val('i_prov')}});
+    toast('Заведение создано','ok'); closeDrawer(); renderInstitutions(); loadCounts();
+  }}]);
+}
+async function openInstEdit(iid){
+  const i=state.insts.find(x=>x.id===iid);
+  drawer('Заведение', instForm(i),[
+    {label:'Сохранить',cls:'btn-accent',fn:async()=>{
+      await api('/institutions/'+iid,{method:'PATCH',body:{name:val('i_name'),city:val('i_city'),schedule_provider:val('i_prov')}});
+      toast('Сохранено','ok'); closeDrawer(); renderInstitutions();
+    }},
+    {label:'Удалить',cls:'btn-danger',fn:()=>delInst(iid,i.name,true)}
+  ]);
+}
+async function delInst(iid,name,fromDrawer){
+  if(!confirm(`Удалить «${name}»? Вместе с ним удалятся все его группы и их ДЗ.`))return;
+  await api('/institutions/'+iid,{method:'DELETE'});
+  toast('Заведение удалено'); if(fromDrawer)closeDrawer(); renderInstitutions(); loadCounts();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  HOMEWORKS
+// ════════════════════════════════════════════════════════════════════
+async function renderHomeworks(){
+  await ensureGroups();
+  const sel = state._hwGroup ?? (state.groups[0]?.id ?? null);
+  state._hwGroup = sel;
+  const picker = `<div class="searchbar"><div class="fg" style="margin:0;min-width:240px">
+    <select id="hwGroupSel" onchange="state._hwGroup=+this.value;renderHomeworks()">
+      ${state.groups.map(g=>`<option value="${g.id}" ${g.id===sel?'selected':''}>${esc(g.name)}</option>`).join('')}
+    </select></div></div>`;
+  if(sel==null){ document.getElementById('content').innerHTML=`<div class="card"><div class="empty"><div class="ico">📝</div>Сначала создай группу</div></div>`; return; }
+  const data=await api('/homeworks?group_id='+sel);
+  const rows=data.homeworks.map(h=>`
+    <tr>
+      <td class="mono">${esc(h.date_for)}</td>
+      <td><div class="cell-name">${esc(h.subject)}</div></td>
+      <td style="max-width:340px"><div class="cell-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.task)}</div></td>
+      <td>${h.subgroup?('пг '+esc(h.subgroup)):'все'}</td>
+      <td><div class="row-actions">
+        <button class="icon-act" title="Изменить" onclick='openHwEdit(${JSON.stringify(h)})'>✎</button>
+        <button class="icon-act danger" title="Удалить" onclick="delHw(${h.id})">🗑</button>
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('content').innerHTML = picker
+    + (data.homeworks.length?`<div class="card"><table>
+        <thead><tr><th>Дата</th><th>Предмет</th><th>Задание</th><th>Кому</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`
+       :`<div class="card"><div class="empty"><div class="ico">📭</div>В этой группе нет заданий</div></div>`);
+}
+function openHwEdit(h){
+  drawer('Задание',`
+    <div class="fg"><label>Дата</label><input id="h_date" type="date" value="${esc(h.date_for)}"></div>
+    <div class="fg"><label>Предмет</label><input id="h_subj" value="${esc(h.subject)}"></div>
+    <div class="fg"><label>Задание</label><textarea id="h_task">${esc(h.task)}</textarea></div>
+  `,[
+    {label:'Сохранить',cls:'btn-accent',fn:async()=>{
+      await api('/homeworks/'+h.id,{method:'PATCH',body:{subject:val('h_subj'),task:val('h_task'),date_for:val('h_date')}});
+      toast('Сохранено','ok'); closeDrawer(); renderHomeworks();
+    }},
+    {label:'Удалить',cls:'btn-danger',fn:()=>delHw(h.id,true)}
+  ]);
+}
+async function delHw(hid,fromDrawer){
+  if(!confirm('Удалить это задание?'))return;
+  await api('/homeworks/'+hid,{method:'DELETE'});
+  toast('Задание удалено'); if(fromDrawer)closeDrawer(); renderHomeworks();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  INVITE LINK (create_group)
+// ════════════════════════════════════════════════════════════════════
+async function openCreateLink(){
+  await ensureInsts();
+  drawer('Ссылка для старосты',`
+    <div class="fg"><label>Привязать к заведению</label><select id="lk_inst">
+      <option value="">Без привязки</option>
+      ${state.insts.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}
+    </select><div class="hint">Староста перейдёт по ссылке, создаст группу и станет её владельцем.</div></div>
+    <div id="lk_out"></div>
+  `,[{label:'Создать ссылку',cls:'btn-accent',fn:async()=>{
+    const r=await api('/invites',{method:'POST',body:{invite_type:'create_group',institution_id:val('lk_inst')||null}});
+    const link='https://t.me/?start='+r.code; // имя бота подставится в Telegram; код — главное
+    document.getElementById('lk_out').innerHTML=`
+      <div class="section-label">Готово — код ссылки</div>
+      <div class="linkbox"><span class="lk mono">${r.code}</span>
+        <button onclick="navigator.clipboard.writeText('${r.code}');toast('Код скопирован','ok')">Копировать</button></div>
+      <div class="hint" style="margin-top:8px">Отдай старосте deep-link: <span class="mono">t.me/&lt;имя_бота&gt;?start=${r.code}</span></div>`;
+    toast('Ссылка создана','ok');
+  }}]);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  DRAWER engine
+// ════════════════════════════════════════════════════════════════════
+function drawer(title, bodyHTML, buttons){
+  document.getElementById('drawerTitle').textContent=title;
+  document.getElementById('drawerBody').innerHTML=bodyHTML;
+  const foot=document.getElementById('drawerFoot'); foot.innerHTML='';
+  (buttons||[]).forEach(b=>{
+    const btn=document.createElement('button'); btn.className='btn '+(b.cls||'btn-ghost'); btn.textContent=b.label;
+    btn.onclick=async()=>{ try{ await b.fn(); }catch(e){ toast(e.message,'err'); } };
+    foot.appendChild(btn);
+  });
+  document.getElementById('scrim').classList.add('show');
+  document.getElementById('drawer').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('scrim').classList.remove('show');
+  document.getElementById('drawer').classList.remove('show');
+}
+const val=id=>document.getElementById(id)?.value.trim()??'';
+function segPick(segId,btn){ document.querySelectorAll('#'+segId+' button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+const segVal=segId=>document.querySelector('#'+segId+' button.active')?.dataset.v??'';
+
+// ── helpers ──
+async function ensureInsts(){ if(!state.insts.length){ const d=await api('/institutions'); state.insts=d.institutions; } }
+async function ensureGroups(){ if(!state.groups.length){ const d=await api('/groups'); state.groups=d.groups; } }
+async function loadCounts(){
+  try{
+    const [u,g,i]=await Promise.all([api('/users'),api('/groups'),api('/institutions')]);
+    document.getElementById('ctUsers').textContent=u.users.length;
+    document.getElementById('ctGroups').textContent=g.groups.length;
+    document.getElementById('ctInst').textContent=i.institutions.length;
+    state.insts=i.institutions; state.groups=g.groups;
+    const totalHw=g.groups.length?'':''; document.getElementById('ctHw').textContent='·';
+  }catch(e){}
+}
+
+// ── wire ──
+document.getElementById('btnLogin').onclick=doLogin;
+document.getElementById('inPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+document.getElementById('btnLogout').onclick=doLogout;
+document.getElementById('drawerClose').onclick=closeDrawer;
+document.getElementById('scrim').onclick=closeDrawer;
+document.getElementById('nav').addEventListener('click',e=>{const b=e.target.closest('.nav-item'); if(b)switchTab(b.dataset.tab)});
+
+// auto-enter if token present
+if(T.token){ enterApp(); } else { document.getElementById('loginScreen').style.display='flex'; }
+</script>
+</body>
+</html>

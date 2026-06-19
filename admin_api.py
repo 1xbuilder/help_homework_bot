@@ -116,6 +116,25 @@ async def login(request):
     data = await _body(request)
     login_v = (data.get("login") or "").strip()
     password = data.get("password") or ""
+
+    # ── Диагностика входа (видно в логах bothost). Секреты НЕ логируются —
+    #    только совпадения и длины, чтобы понять причину 401. После починки
+    #    этот блок можно удалить.
+    import logging
+    log = logging.getLogger("admin_login")
+    admin_auth._refresh()
+    env_login = admin_auth._env("ADMIN_PANEL_LOGIN")
+    env_hash = admin_auth._env("ADMIN_PANEL_PASSWORD_HASH")
+    login_match = (login_v == env_login)
+    pw_match = admin_auth.verify_password(password, env_hash)
+    log.warning(
+        "LOGIN TRY: got_login=%r env_login=%r login_match=%s | "
+        "pw_len=%d hash_present=%s hash_len=%d hash_tail=%r | pw_match=%s",
+        login_v, env_login, login_match,
+        len(password), bool(env_hash), len(env_hash), env_hash[-8:] if env_hash else "",
+        pw_match,
+    )
+
     if not admin_auth.check_credentials(login_v, password):
         return _err(request, "Неверный логин или пароль", 401)
     token = admin_auth.issue_token(login_v)

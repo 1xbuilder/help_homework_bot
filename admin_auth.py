@@ -23,9 +23,26 @@ import hashlib
 
 TOKEN_TTL = 60 * 60 * 12  # 12 часов
 
-ADMIN_LOGIN = os.getenv("ADMIN_PANEL_LOGIN", "")
-ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PANEL_PASSWORD_HASH", "")
-ADMIN_SECRET = os.getenv("ADMIN_PANEL_SECRET", "")
+
+# Переменные окружения читаем ЖИВЫМИ при каждом обращении, а не один раз при
+# импорте — чтобы значение не «застывало», если окружение поднялось позже.
+def _env(name):
+    return os.getenv(name, "")
+
+
+# Совместимость: код и диагностика обращаются к admin_auth.ADMIN_LOGIN и т.п.
+# Это обычные строки, но мы обновляем их перед каждой проверкой через _refresh().
+ADMIN_LOGIN = _env("ADMIN_PANEL_LOGIN")
+ADMIN_PASSWORD_HASH = _env("ADMIN_PANEL_PASSWORD_HASH")
+ADMIN_SECRET = _env("ADMIN_PANEL_SECRET")
+
+
+def _refresh():
+    """Перечитывает env в модульные атрибуты (на случай позднего поднятия окружения)."""
+    global ADMIN_LOGIN, ADMIN_PASSWORD_HASH, ADMIN_SECRET
+    ADMIN_LOGIN = _env("ADMIN_PANEL_LOGIN")
+    ADMIN_PASSWORD_HASH = _env("ADMIN_PANEL_PASSWORD_HASH")
+    ADMIN_SECRET = _env("ADMIN_PANEL_SECRET")
 
 
 def _b64e(raw: bytes) -> str:
@@ -63,20 +80,22 @@ def verify_password(password: str, stored: str) -> bool:
 # ── Токены сессии ──────────────────────────────────────────────────────────────
 
 def issue_token(login: str) -> str:
+    secret = _env("ADMIN_PANEL_SECRET")
     payload = {"login": login, "exp": int(time.time()) + TOKEN_TTL}
     data = _b64e(json.dumps(payload, separators=(",", ":")).encode())
-    sig = _b64e(hmac.new(ADMIN_SECRET.encode(), data.encode(), hashlib.sha256).digest())
+    sig = _b64e(hmac.new(secret.encode(), data.encode(), hashlib.sha256).digest())
     return f"{data}.{sig}"
 
 
 def verify_token(token: str) -> bool:
     """True, если токен валиден по подписи и не истёк."""
-    if not token or not ADMIN_SECRET:
+    secret = _env("ADMIN_PANEL_SECRET")
+    if not token or not secret:
         return False
     try:
         data, sig = token.split(".", 1)
         expected = _b64e(
-            hmac.new(ADMIN_SECRET.encode(), data.encode(), hashlib.sha256).digest()
+            hmac.new(secret.encode(), data.encode(), hashlib.sha256).digest()
         )
         if not hmac.compare_digest(sig, expected):
             return False
@@ -91,13 +110,18 @@ def verify_token(token: str) -> bool:
 # ── Проверка логина ────────────────────────────────────────────────────────────
 
 def check_credentials(login: str, password: str) -> bool:
-    if not (ADMIN_LOGIN and ADMIN_PASSWORD_HASH and ADMIN_SECRET):
+    _refresh()
+    env_login = _env("ADMIN_PANEL_LOGIN")
+    env_hash = _env("ADMIN_PANEL_PASSWORD_HASH")
+    env_secret = _env("ADMIN_PANEL_SECRET")
+    if not (env_login and env_hash and env_secret):
         # Конфигурация не задана — вход запрещён (чтобы не пускать с пустыми env).
         return False
-    if not hmac.compare_digest(login or "", ADMIN_LOGIN):
+    if not hmac.compare_digest(login or "", env_login):
         return False
-    return verify_password(password or "", ADMIN_PASSWORD_HASH)
+    return verify_password(password or "", env_hash)
 
 
 def is_configured() -> bool:
-    return bool(ADMIN_LOGIN and ADMIN_PASSWORD_HASH and ADMIN_SECRET)
+    return bool(_env("ADMIN_PANEL_LOGIN") and _env("ADMIN_PANEL_PASSWORD_HASH")
+                and _env("ADMIN_PANEL_SECRET"))

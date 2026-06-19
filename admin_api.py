@@ -117,24 +117,6 @@ async def login(request):
     login_v = (data.get("login") or "").strip()
     password = data.get("password") or ""
 
-    # ── Диагностика входа (видно в логах bothost). Секреты НЕ логируются —
-    #    только совпадения и длины, чтобы понять причину 401. После починки
-    #    этот блок можно удалить.
-    import logging
-    log = logging.getLogger("admin_login")
-    admin_auth._refresh()
-    env_login = admin_auth._env("ADMIN_PANEL_LOGIN")
-    env_hash = admin_auth._env("ADMIN_PANEL_PASSWORD_HASH")
-    login_match = (login_v == env_login)
-    pw_match = admin_auth.verify_password(password, env_hash)
-    log.warning(
-        "LOGIN TRY: got_login=%r env_login=%r login_match=%s | "
-        "pw_len=%d hash_present=%s hash_len=%d hash_tail=%r | pw_match=%s",
-        login_v, env_login, login_match,
-        len(password), bool(env_hash), len(env_hash), env_hash[-8:] if env_hash else "",
-        pw_match,
-    )
-
     if not admin_auth.check_credentials(login_v, password):
         return _err(request, "Неверный логин или пароль", 401)
     token = admin_auth.issue_token(login_v)
@@ -144,6 +126,45 @@ async def login(request):
 @require_auth
 async def me(request):
     return _json(request, {"ok": True})
+
+
+@require_auth
+async def stats(request):
+    """GET /api/admin/stats — сводка для дашборда: счётчики и проблемные группы."""
+    try:
+        users = []
+        r = ops.supabase.table("users").select("user_id,global_role").limit(5000).execute()
+        users = r.data or []
+    except Exception:
+        users = []
+    insts = ops.list_institutions()
+    groups = ops.list_all_groups()
+
+    admins = sum(1 for u in users if u.get("global_role") == "admin")
+    mods = sum(1 for u in users if u.get("global_role") == "moderator")
+
+    # Проблемные группы: без старосты или без единого ДЗ.
+    no_owner, no_hw = [], []
+    inst_name = {i.id: i.name for i in insts}
+    total_hw = 0
+    for g in groups:
+        owners = ops.list_group_members(g.id, role="owner")
+        hws = ops.get_all_homeworks(group_id=g.id)
+        total_hw += len(hws)
+        meta = {"id": g.id, "name": g.name,
+                "institution": inst_name.get(g.institution_id, "—")}
+        if not owners:
+            no_owner.append(meta)
+        if not hws:
+            no_hw.append(meta)
+
+    return _json(request, {
+        "counts": {
+            "users": len(users), "admins": admins, "moderators": mods,
+            "institutions": len(insts), "groups": len(groups), "homeworks": total_hw,
+        },
+        "problems": {"no_owner": no_owner, "no_homework": no_hw},
+    })
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -451,6 +472,32 @@ async def homeworks_list(request):
 
 
 @require_auth
+async def homework_create(request):
+    """POST /api/admin/homeworks {group_id, subject, task, date_for, subgroup?}."""
+    data = await _body(request)
+    gid = data.get("group_id")
+    subject = (data.get("subject") or "").strip()
+    task = (data.get("task") or "").strip()
+    date_for = (data.get("date_for") or "").strip()
+    if not gid:
+        return _err(request, "Не указана группа")
+    if not subject:
+        return _err(request, "Не указан предмет")
+    if not task:
+        return _err(request, "Пустое задание")
+    if not date_for:
+        return _err(request, "Не указана дата")
+    sub = (data.get("subgroup") or "").strip() or None
+    h = ops.add_homework_to_db(
+        group_id=int(gid), subject=subject, task=task,
+        date_for=date_for, subgroup=sub, created_by=None,
+    )
+    if not h:
+        return _err(request, "Не удалось создать ДЗ", 500)
+    return _json(request, _hw_dict(h))
+
+
+@require_auth
 async def homework_update(request):
     hid = int(request.match_info["hid"])
     data = await _body(request)
@@ -530,6 +577,7 @@ def register_admin_routes(app: web.Application):
 
     r.add_post("/api/admin/login", login)
     r.add_get("/api/admin/me", me)
+    r.add_get("/api/admin/stats", stats)
 
     r.add_get("/api/admin/users", users_list)
     r.add_get("/api/admin/users/{uid}", user_get)
@@ -552,6 +600,7 @@ def register_admin_routes(app: web.Application):
     r.add_get("/api/admin/groups/{gid}/invites", group_invites_list)
 
     r.add_get("/api/admin/homeworks", homeworks_list)
+    r.add_post("/api/admin/homeworks", homework_create)
     r.add_patch("/api/admin/homeworks/{hid}", homework_update)
     r.add_delete("/api/admin/homeworks/{hid}", homework_delete)
 

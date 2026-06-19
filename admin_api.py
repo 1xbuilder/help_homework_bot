@@ -19,30 +19,60 @@ from database import db_operations as ops
 
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
-# Разрешаем фронт с GitHub Pages и localhost (для локальной отладки).
-# Origin берётся из заголовка запроса; если он в белом списке — отражаем его.
-ALLOWED_ORIGIN_SUFFIXES = (
-    ".github.io",
-    "localhost",
-    "127.0.0.1",
-)
+# Заголовки навешивает middleware (cors_middleware ниже) на КАЖДЫЙ ответ под
+# /api/admin/*, включая preflight OPTIONS и ошибки. Здесь — только построение
+# набора заголовков по origin запроса.
+#
+# Пускаем любой github.io (твой сайт), localhost и file:// (локальная отладка).
+# Если нужен свой домен — добавь его в _origin_allowed.
+
+def _origin_allowed(origin: str) -> bool:
+    if not origin:
+        return False
+    o = origin.lower()
+    return (
+        o.endswith(".github.io")
+        or "github.io" in o
+        or "localhost" in o
+        or "127.0.0.1" in o
+        or o == "null"  # file:// открывается с Origin: null
+    )
 
 
 def _cors_headers(request):
     origin = request.headers.get("Origin", "")
-    allow = ""
-    if origin:
-        host_ok = any(
-            origin.endswith(suf) or f"//{suf}" in origin or suf in origin
-            for suf in ALLOWED_ORIGIN_SUFFIXES
-        )
-        allow = origin if host_ok else ""
+    # Если origin разрешён — отражаем его; иначе '*' (для запросов без credentials
+    # это допустимо и не ломает простые проверки).
+    allow = origin if _origin_allowed(origin) else "*"
     return {
-        "Access-Control-Allow-Origin": allow or "*",
+        "Access-Control-Allow-Origin": allow,
         "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Authorization, Content-Type",
         "Access-Control-Max-Age": "86400",
+        "Vary": "Origin",
     }
+
+
+@web.middleware
+async def cors_middleware(request, handler):
+    """Гарантирует CORS-заголовки на любом ответе под /api/admin/*, в т.ч. при
+    405/500 и preflight. Без этого браузер режет запрос ещё до логина."""
+    is_admin = request.path.startswith("/api/admin")
+    # Preflight отвечаем сразу, не доходя до конкретного обработчика.
+    if is_admin and request.method == "OPTIONS":
+        return web.Response(status=204, headers=_cors_headers(request))
+    try:
+        resp = await handler(request)
+    except web.HTTPException as exc:
+        # Ошибки роутинга (404/405) — тоже с заголовками, иначе будет «Failed to fetch».
+        if is_admin:
+            for k, v in _cors_headers(request).items():
+                exc.headers[k] = v
+        raise
+    if is_admin:
+        for k, v in _cors_headers(request).items():
+            resp.headers[k] = v
+    return resp
 
 
 def _json(request, data, status=200):
@@ -470,16 +500,14 @@ async def group_invites_list(request):
 #  Регистрация роутов
 # ═══════════════════════════════════════════════════════════════════════════════
 
-async def _options(request):
-    return web.Response(headers=_cors_headers(request))
-
-
 def register_admin_routes(app: web.Application):
     """Вызывается из photo_proxy.create_proxy_app(), добавляет роуты к приложению."""
-    r = app.router
+    # CORS-middleware вешаем первым — он обрабатывает preflight и навешивает
+    # заголовки на все ответы под /api/admin/*.
+    if cors_middleware not in app.middlewares:
+        app.middlewares.append(cors_middleware)
 
-    # OPTIONS-preflight для всех админских путей
-    r.add_route("OPTIONS", "/api/admin/{tail:.*}", _options)
+    r = app.router
 
     r.add_post("/api/admin/login", login)
     r.add_get("/api/admin/me", me)
